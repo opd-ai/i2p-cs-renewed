@@ -54,7 +54,7 @@
 **Why**: SSU2 is the primary UDP transport for modern I2P routers. i2pd and Java I2P default to SSU2 for most peer connections. A C# router unable to establish SSU2 sessions cannot participate fully in the network, directly blocking transit tunnel establishment and NetDB floodfill via new peers.  
 **Current State**: SSU2 state machine code exists in `src/I2PCore/TransportLayer/SSU2/SSU2Session.cs` (1704 lines) and supporting files, but README explicitly marks both inbound and outbound as "Totally broken". Integration tests in `SSU2ConnectivityTests.cs` exist but require a live i2pd peer and cannot run in CI.  
 **Required Changes**:
-- [ ] Instrument `SSU2Session.cs` with debug logging at each handshake state transition to identify where SessionRequest/SessionCreated/SessionConfirmed exchange fails
+- [x] Instrument `SSU2Session.cs` with debug logging at each handshake state transition to identify where SessionRequest/SessionCreated/SessionConfirmed exchange fails
 - [ ] Compare `SSU2Host.cs` packet routing with the i2pd reference implementation (i2pd `SSU2.cpp`/`SSU2Session.cpp`) to find divergence in the Noise XK handshake
 - [ ] Verify that `SSU2SecurityValidator.cs` correctly validates headers before state machine transitions
 - [ ] Fix `SSU2AckManager.cs` if ACK handling is preventing the handshake from completing
@@ -79,7 +79,7 @@
 - [ ] Trace a complete garlic message from `ClientDestination.Send.cs` through `Session.cs` to `ECIESSessionKeyManager.cs` to find where the 70%→100% gap is (missing `LS2` re-inclusion? Wrong tag indexing?)
 - [ ] Fix session key manager to correctly handle re-keying when the remote's `NextKey` block arrives
 - [ ] Add unit tests for `StreamingProtocolTest.cs` covering retransmission and window management (currently `I2PStream.cs` has `_isTimeoutResend` assigned but unused at line 92 — CS0414)
-- [ ] Resolve CS0414 warning: `I2PStream._isTimeoutResend` at `src/I2PCore/SessionLayer/Streaming/I2PStream.cs:92` — either implement the resend timeout or remove the unused field
+- [x] Resolve CS0414 warning: `I2PStream._isTimeoutResend` at `src/I2PCore/SessionLayer/Streaming/I2PStream.cs:92` — either implement the resend timeout or remove the unused field
 
 **Success Criteria**:
 - [ ] `EncryptionCompatibilityTests.cs` echo test passes end-to-end against i2pd
@@ -95,7 +95,7 @@
 **Why**: Transit tunnel support (the "middle hop") is at 70%, but outbound endpoints and inbound gateways are broken. Without these, the router cannot participate as a full relay node, which is required for tunnel-based NetDB lookups (currently working only via direct connections) and for the project to serve as a useful network participant.  
 **Current State**: `src/I2PCore/TunnelLayer/TunnelProvider.cs` (2380 lines) contains the tunnel lifecycle logic. `GatewayTunnel.cs` has a confirmed method-hiding bug (CS0114). `TunnelBuildTests.cs` has integration tests but these require live network peers and do not run in CI.  
 **Required Changes**:
-- [ ] Fix `GatewayTunnel.HandleReceiveQueue()` at `src/I2PCore/TunnelLayer/GatewayTunnel.cs:71` — add either `override` (if intentional polymorphism) or `new` keyword (if intentional shadowing); CS0114 warning indicates this virtual dispatch is currently broken
+- [x] Fix `GatewayTunnel.HandleReceiveQueue()` at `src/I2PCore/TunnelLayer/GatewayTunnel.cs:71` — add either `override` (if intentional polymorphism) or `new` keyword (if intentional shadowing); CS0114 warning indicates this virtual dispatch is currently broken
 - [ ] Audit outbound tunnel endpoint packet handling against the I2NP spec — compare with `src/I2PCore/TunnelLayer/I2NP/Messages/VariableTunnelBuildMessage.cs` (613 lines) for message format correctness
 - [ ] Add offline unit tests for `GatewayTunnel.HandleReceiveQueue()` that verify it processes a valid inbound tunnel data message without requiring a live peer
 - [ ] Decompose `TunnelProvider.cs` (2380 lines) — extract tunnel build, tunnel maintenance, and tunnel selection into separate classes to make the code reviewable
@@ -115,12 +115,12 @@
 **Why**: The CI workflow at `.github/workflows/dotnet.yml` specifies `dotnet-version: 5.0.x`, but the entire solution targets `net10.0`. This means CI has been non-functional since the framework upgrade. Every commit is merged without build or test verification, removing the project's only automated safety net.  
 **Current State**: The workflow file runs `dotnet restore`, `dotnet build`, and `dotnet test`, which is the right structure, but the wrong SDK version. No coverage collection, no format checks, and no security auditing are configured.  
 **Required Changes**:
-- [ ] Update `.github/workflows/dotnet.yml` `dotnet-version` from `5.0.x` to `10.0.x` (or `10.x`)
-- [ ] Update `actions/checkout` from `v2` to `v4`
-- [ ] Update `actions/setup-dotnet` from `v1` to `v4`
-- [ ] Add `dotnet list package --vulnerable --include-transitive` step to catch security regressions
-- [ ] Add `--filter "Category!=Integration"` to `dotnet test` so that offline unit tests always run in CI (integration tests require a live i2pd peer)
-- [ ] Add code coverage collection: add `coverlet.collector` package to `I2PCore.NTests.csproj` and pass `--collect:"XPlat Code Coverage"` to the test step
+- [x] Update `.github/workflows/dotnet.yml` `dotnet-version` from `5.0.x` to `10.0.x` (or `10.x`)
+- [x] Update `actions/checkout` from `v2` to `v4`
+- [x] Update `actions/setup-dotnet` from `v1` to `v4`
+- [x] Add `dotnet list package --vulnerable --include-transitive` step to catch security regressions
+- [x] Add `--filter "Category!=Integration"` to `dotnet test` so that offline unit tests always run in CI (integration tests require a live i2pd peer)
+- [x] Add code coverage collection: add `coverlet.collector` package to `I2PCore.NTests.csproj` and pass `--collect:"XPlat Code Coverage"` to the test step
 
 **Success Criteria**:
 - [ ] CI workflow completes successfully on `github-master` branch
@@ -138,7 +138,7 @@
 **Required Changes**:
 - [ ] Profile a test run with 100 NTCP2 sessions to establish a per-session baseline byte count (use `dotnet-trace` or VS profiler)
 - [ ] Replace `new byte[]` receive buffers in `NTCP2Session.cs` with `ArrayPool<byte>.Shared.Rent()` / `Return()` pattern
-- [ ] Resolve CS0414 warnings: `NTCP2Session.ReceiveNonce` (line 84) and `NTCP2Session.SendNonce` (line 95) — either implement nonce tracking (replay protection) or remove the dead fields
+- [x] Resolve CS0414 warnings: `NTCP2Session.ReceiveNonce` (line 84) and `NTCP2Session.SendNonce` (line 95) — either implement nonce tracking (replay protection) or remove the dead fields
 - [ ] Use `System.IO.Pipelines` (`PipeReader`/`PipeWriter`) for the NTCP2 session receive loop to reduce buffer copying
 - [ ] Add a memory benchmark test that asserts per-session overhead is under 200KB
 
@@ -160,11 +160,11 @@
 | `src/I2PCore/Client/SAMBridge.cs` | Extreme file size | 1972 lines | Split into SAM protocol parser, client session manager, I2P bridge |
 | `src/I2PCore/TransportLayer/SSU2/SSU2Session.cs` | Large file size | 1704 lines | Split by handshake state machine and data phase |
 | `src/I2PCore/TransportLayer/SSU2/SSU2RelayHandler.cs` | Large file size | 1482 lines | Extract relay packet formatting from relay routing logic |
-| `src/I2PCore/TunnelLayer/GatewayTunnel.cs` | Method hiding bug | CS0114 at line 71 — `HandleReceiveQueue()` hides base class method | Add `override` or `new` keyword immediately |
-| `src/I2PCore/Crypto/Noise/NoiseIKhfs.cs` | Method hiding bug | CS0108 at line 302 — `FinalizeHandshake()` hides base class method | Add `override` or `new` keyword |
+| ~~`src/I2PCore/TunnelLayer/GatewayTunnel.cs`~~ | ~~Method hiding bug~~ | ~~CS0114 at line 71 — `HandleReceiveQueue()` hides base class method~~ | ✅ Fixed: `new` keyword added |
+| ~~`src/I2PCore/Crypto/Noise/NoiseIKhfs.cs`~~ | ~~Method hiding bug~~ | ~~CS0108 at line 302 — `FinalizeHandshake()` hides base class method~~ | ✅ Fixed: `new` keyword added |
 | `src/I2PCore/Data/I2PEncryptedLeaseSet.cs`, `src/I2PCore/TunnelLayer/ECIES/ECIESTunnelDecrypt.cs`, `src/I2PCore/Data/I2PRouterInfo.cs` | Dead null checks | CS8073 — comparing `I2PByteBlock` (struct) to null is always false | Remove meaningless null guards; implement `IEquatable` or use `default` comparison if intent is to check for empty |
-| `src/I2PCore/TransportLayer/NTCP2/NTCP2ProbingResistance.cs:105` | Inexact stream read | CA2022 — `Stream.Read()` may return fewer bytes than requested | Replace with `Stream.ReadExactly()` (available in .NET 7+) |
-| `src/I2PCore.NTests/` (all integration test files) | Obsolete API | CS0618 × 52 — `[Timeout]` attribute deprecated in NUnit 4 | Replace `[Timeout(ms)]` with `[CancelAfter(ms)]` throughout integration tests |
+| ~~`src/I2PCore/TransportLayer/NTCP2/NTCP2ProbingResistance.cs:105`~~ | ~~Inexact stream read~~ | ~~CA2022 — `Stream.Read()` may return fewer bytes than requested~~ | ✅ Fixed: replaced with `ReadExactly()` |
+| ~~`src/I2PCore.NTests/` (all integration test files)~~ | ~~Obsolete API~~ | ~~CS0618 × 26 — `[Timeout]` attribute deprecated in NUnit 4~~ | ✅ Fixed: replaced with `[CancelAfter(ms)]` |
 | `src/I2PRouterWeb/Pages/NetDbLookup.cshtml.cs` | Nullable warnings in web UI | CS8600 × 6, CS8602 × 3 | Add null guards or enable proper nullable flow analysis |
 | `src/I2PCore/Client/I2PControlService.cs` | Large file | 623 lines | Extract JSON-RPC dispatch from I2P-specific control logic |
 

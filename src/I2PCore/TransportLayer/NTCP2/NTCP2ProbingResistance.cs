@@ -102,7 +102,7 @@ public static class NTCP2ProbingResistance
 
                 try
                 {
-                    stream.Read(buffer, 0, buffer.Length);
+                    stream.ReadExactly(buffer, 0, buffer.Length);
                 }
                 catch
                 {

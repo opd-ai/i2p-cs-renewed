@@ -30,7 +30,7 @@ public class NTCP2ConnectivityTests
     ///     Verifies the Noise XK handshake completes successfully.
     /// </summary>
     [Test]
-    [Timeout(30000)]
+    [CancelAfter(30000)]
     public async Task TestCSharpConnectsToI2pd_NTCP2()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -62,7 +62,7 @@ public class NTCP2ConnectivityTests
     ///     RouterInfo exchange making i2pd aware of us).
     /// </summary>
     [Test]
-    [Timeout(60000)]
+    [CancelAfter(60000)]
     public async Task TestI2pdConnectsToCSharp_NTCP2()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -88,7 +88,7 @@ public class NTCP2ConnectivityTests
     ///     After handshake, send a DatabaseStoreMessage and verify delivery.
     /// </summary>
     [Test]
-    [Timeout(45000)]
+    [CancelAfter(45000)]
     public async Task TestNTCP2DataExchange_I2pd()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -124,7 +124,7 @@ public class NTCP2ConnectivityTests
     ///     Verifies DateTime, RouterInfo, and I2NP blocks are processed correctly.
     /// </summary>
     [Test]
-    [Timeout(45000)]
+    [CancelAfter(45000)]
     public async Task TestNTCP2BlockProcessing()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -165,7 +165,7 @@ public class NTCP2ConnectivityTests
     ///     Requires i2pd version that supports ML-KEM.
     /// </summary>
     [Test]
-    [Timeout(30000)]
+    [CancelAfter(30000)]
     public async Task TestCSharpConnectsToI2pd_NTCP2_PQ()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -199,7 +199,7 @@ public class NTCP2ConnectivityTests
     ///     works correctly in the data phase with a real peer.
     /// </summary>
     [Test]
-    [Timeout(45000)]
+    [CancelAfter(45000)]
     public async Task TestNTCP2MultipleMessages_I2pd()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -233,7 +233,7 @@ public class NTCP2ConnectivityTests
     ///     Test NTCP2 connection survives idle period.
     /// </summary>
     [Test]
-    [Timeout(60000)]
+    [CancelAfter(60000)]
     public async Task TestNTCP2ConnectionPersistence()
     {
         var router = TestNetworkFixture.CSharpRouter;

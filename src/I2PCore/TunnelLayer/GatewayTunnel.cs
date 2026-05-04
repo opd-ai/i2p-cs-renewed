@@ -68,7 +68,7 @@ public class GatewayTunnel : InboundTunnel
  new ItemFilterWindow<HashedItemGroup>( TickSpan.Seconds( 30 ), 2 );
 #endif
 
-    private bool HandleReceiveQueue()
+    private new bool HandleReceiveQueue()
     {
         I2NpMessage[] messages = null;
 

@@ -36,7 +36,7 @@ public class SSU2ConnectivityTests
     ///     Verifies the Noise XK handshake over UDP completes.
     /// </summary>
     [Test]
-    [Timeout(30000)]
+    [CancelAfter(30000)]
     public async Task TestCSharpConnectsToI2pd_SSU2()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -64,7 +64,7 @@ public class SSU2ConnectivityTests
     ///     and the session can be initiated.
     /// </summary>
     [Test]
-    [Timeout(30000)]
+    [CancelAfter(30000)]
     public async Task TestSSU2AddressParsing()
     {
         var i2pdInfo = TestNetworkFixture.I2pdRouterInfo;
@@ -97,7 +97,7 @@ public class SSU2ConnectivityTests
     ///     Sends I2NP messages and verifies they don't crash the session.
     /// </summary>
     [Test]
-    [Timeout(45000)]
+    [CancelAfter(45000)]
     public async Task TestSSU2DataExchange()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -131,7 +131,7 @@ public class SSU2ConnectivityTests
     ///     Test SSU2 with ML-KEM768 post-quantum hybrid.
     /// </summary>
     [Test]
-    [Timeout(30000)]
+    [CancelAfter(30000)]
     public async Task TestCSharpConnectsToI2pd_SSU2_PQ()
     {
         var i2pdInfo = TestNetworkFixture.I2pdRouterInfo;
@@ -158,7 +158,7 @@ public class SSU2ConnectivityTests
     ///     and verifying the connection stays alive.
     /// </summary>
     [Test]
-    [Timeout(45000)]
+    [CancelAfter(45000)]
     public async Task TestSSU2ACKHandling()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -191,7 +191,7 @@ public class SSU2ConnectivityTests
     ///     Test that SSU2 session persists through an idle period.
     /// </summary>
     [Test]
-    [Timeout(60000)]
+    [CancelAfter(60000)]
     public async Task TestSSU2SessionPersistence()
     {
         var router = TestNetworkFixture.CSharpRouter;

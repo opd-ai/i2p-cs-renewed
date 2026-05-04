@@ -469,6 +469,8 @@ public class SSU2Session : ITransport
 
     private void SendSessionRequest()
     {
+        Logging.LogDebug($"{DebugId}: Sending SessionRequest to {RemoteEndpoint} (PQ={IsPQ})");
+
         // Get Bob's intro key for header encryption
         var bobIntroKey = GetRemoteIntroKey();
         var kHeader1 = bobIntroKey;
@@ -585,6 +587,8 @@ public class SSU2Session : ITransport
     {
         try
         {
+            Logging.LogDebug($"{DebugId}: ProcessReceivedPacket ({packetData.Length} bytes, State: {State})");
+
             // Decrypt header for type identification
             // SSU2 spec: long headers (Request/Created/Confirmed) are obfuscated differently than short headers (Data).
             // We need to try long header decryption first.
@@ -612,6 +616,8 @@ public class SSU2Session : ITransport
                     type = shortDecrypted[12]; // Type at offset 12 in short header
                 }
             }
+
+            Logging.LogDebug($"{DebugId}: Detected packet type {type} (State: {State})");
 
             switch (type)
             {
@@ -647,6 +653,8 @@ public class SSU2Session : ITransport
 
     private void ProcessSessionRequest(byte[] packetData)
     {
+        Logging.LogDebug($"{DebugId}: Processing SessionRequest ({packetData.Length} bytes, State: {State})");
+
         if (State != SessionState.Initial)
         {
             Logging.LogWarning($"{DebugId}: Received SessionRequest in state {State}");
@@ -786,6 +794,8 @@ public class SSU2Session : ITransport
 
     private void ProcessSessionCreated(byte[] packetData)
     {
+        Logging.LogDebug($"{DebugId}: Processing SessionCreated ({packetData.Length} bytes, State: {State})");
+
         if (State != SessionState.SessionRequestSent)
         {
             Logging.LogWarning($"{DebugId}: Received SessionCreated in state {State}");
@@ -937,6 +947,8 @@ public class SSU2Session : ITransport
 
     private void ProcessSessionConfirmed(byte[] packetData)
     {
+        Logging.LogDebug($"{DebugId}: Processing SessionConfirmed ({packetData.Length} bytes, State: {State})");
+
         if (State != SessionState.SessionCreatedSent)
         {
             Logging.LogWarning($"{DebugId}: Received SessionConfirmed in state {State}");
@@ -1356,6 +1368,8 @@ public class SSU2Session : ITransport
 
     private void SendSessionCreated()
     {
+        Logging.LogDebug($"{DebugId}: Sending SessionCreated to {RemoteEndpoint} (PQ={IsPQ})");
+
         // Re-use current Noise state (must not re-initialize Bob because he already processed Message 1)
 
         // Header (plaintext initially)
@@ -1464,6 +1478,8 @@ public class SSU2Session : ITransport
 
     private void SendSessionConfirmed()
     {
+        Logging.LogDebug($"{DebugId}: Sending SessionConfirmed to {RemoteEndpoint}");
+
         // Get our RouterInfo
         var myRouterInfo = Host.GetMyRouterInfo();
 

@@ -80,19 +80,11 @@ public class NTCP2Session : ITransport
     private byte[] PreSplitChainingKey;
     private byte[] PreSplitHash;
     private int ReceiveBufferPos;
-    private byte[] ReceiveKey;
-    private ulong ReceiveNonce = 0;
     private NTCP2SipHash ReceiveSipHash;
     private byte[] RemoteKemPublicKey;
     private ushort RemoteM3P2Len;
     private byte RemoteNetworkId;
     private byte RemoteVersion;
-
-    // Session keys (after handshake)
-    private byte[] SendKey;
-
-    // Frame counters
-    private ulong SendNonce = 0;
 
     // SipHash keys for frame length obfuscation
     private NTCP2SipHash SendSipHash;
@@ -2017,12 +2009,5 @@ public class NTCP2Session : ITransport
     {
         // Zero out all sensitive key material
         NoiseState?.Clear();
-        ClearArray(SendKey);
-        ClearArray(ReceiveKey);
-    }
-
-    private void ClearArray(byte[] array)
-    {
-        if (array != null) Array.Clear(array, 0, array.Length);
     }
 }

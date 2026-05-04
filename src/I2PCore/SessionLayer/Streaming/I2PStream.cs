@@ -89,7 +89,6 @@ public class I2PStream : IDisposable
     private bool _isChoking2;
     private bool _isChoking3;
     private bool _isFirstAck = true;
-    private bool _isTimeoutResend;
     private bool _synSent;
     private double _jitter = 50;
     private double _jitterAccum;
@@ -1162,7 +1161,6 @@ public class I2PStream : IDisposable
                     pkt.Resent = true;
                     pkt.SendTime = now;
                     toResend.Add(pkt);
-                    _isTimeoutResend = false;
                 }
 
         // Timeout-based retransmit: only one packet per RTO (RFC compliance)
@@ -1212,7 +1210,6 @@ public class I2PStream : IDisposable
                 oldest.Resent = true;
                 oldest.SendTime = now;
                 toResend.Add(oldest);
-                _isTimeoutResend = true;
 
                 // Timeout means congestion: reset window
                 ResetWindowSize();

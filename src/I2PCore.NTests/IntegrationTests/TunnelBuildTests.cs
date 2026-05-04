@@ -48,7 +48,7 @@ public class TunnelBuildTests
     ///     i2pd responds with an accept.
     /// </summary>
     [Test]
-    [Timeout(120000)]
+    [CancelAfter(120000)]
     public async Task TestBuildOutboundTunnel_I2pdHop()
     {
         await EnsureConnected();
@@ -89,7 +89,7 @@ public class TunnelBuildTests
     ///     Test that our router can build an inbound tunnel using i2pd as a hop.
     /// </summary>
     [Test]
-    [Timeout(120000)]
+    [CancelAfter(120000)]
     public async Task TestBuildInboundTunnel_I2pdHop()
     {
         await EnsureConnected();
@@ -125,7 +125,7 @@ public class TunnelBuildTests
     ///     the other, so i2pd should request transit tunnels through us.
     /// </summary>
     [Test]
-    [Timeout(120000)]
+    [CancelAfter(120000)]
     public async Task TestTransitTunnel_I2pdUsesCSharp()
     {
         await EnsureConnected();
@@ -172,7 +172,7 @@ public class TunnelBuildTests
     ///     Verifies end-to-end: build request -> accept -> data transmission.
     /// </summary>
     [Test]
-    [Timeout(120000)]
+    [CancelAfter(120000)]
     public async Task TestTunnelDataFlow()
     {
         await EnsureConnected();
@@ -218,7 +218,7 @@ public class TunnelBuildTests
     ///     Verifies our router handles reject responses gracefully.
     /// </summary>
     [Test]
-    [Timeout(60000)]
+    [CancelAfter(60000)]
     public async Task TestTunnelBuildRejectHandling()
     {
         await EnsureConnected();

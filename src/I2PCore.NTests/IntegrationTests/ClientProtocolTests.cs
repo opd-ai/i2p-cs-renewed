@@ -31,7 +31,7 @@ public class ClientProtocolTests
     ///     Verifies protocol version negotiation matches expected format.
     /// </summary>
     [Test]
-    [Timeout(15000)]
+    [CancelAfter(15000)]
     public async Task TestSAM_Hello_I2pd()
     {
         var samPort = PortAllocator.WellKnown.I2pdSam;
@@ -72,7 +72,7 @@ public class ClientProtocolTests
     ///     Verifies SESSION CREATE response format.
     /// </summary>
     [Test]
-    [Timeout(30000)]
+    [CancelAfter(30000)]
     public async Task TestSAM_SessionCreate_I2pd()
     {
         var samPort = PortAllocator.WellKnown.I2pdSam;
@@ -116,7 +116,7 @@ public class ClientProtocolTests
     ///     Test SAM NAMING LOOKUP against i2pd.
     /// </summary>
     [Test]
-    [Timeout(15000)]
+    [CancelAfter(15000)]
     public async Task TestSAM_NamingLookup_I2pd()
     {
         var samPort = PortAllocator.WellKnown.I2pdSam;
@@ -154,7 +154,7 @@ public class ClientProtocolTests
     ///     Test SAM datagram session against i2pd.
     /// </summary>
     [Test]
-    [Timeout(30000)]
+    [CancelAfter(30000)]
     public async Task TestSAM_DatagramSession_I2pd()
     {
         var samPort = PortAllocator.WellKnown.I2pdSam;
@@ -194,7 +194,7 @@ public class ClientProtocolTests
     ///     Verifies the initial protocol byte exchange.
     /// </summary>
     [Test]
-    [Timeout(15000)]
+    [CancelAfter(15000)]
     public async Task TestI2CP_Connect_I2pd()
     {
         var i2cpPort = PortAllocator.WellKnown.I2pdI2cp;
@@ -254,7 +254,7 @@ public class ClientProtocolTests
     ///     Test that I2CP GetDate/SetDate exchange works with i2pd.
     /// </summary>
     [Test]
-    [Timeout(15000)]
+    [CancelAfter(15000)]
     public async Task TestI2CP_GetDate_I2pd()
     {
         var i2cpPort = PortAllocator.WellKnown.I2pdI2cp;
