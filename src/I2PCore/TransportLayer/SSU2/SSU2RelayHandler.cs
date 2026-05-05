@@ -994,9 +994,8 @@ public class SSU2RelayHandler
         };
         var headerBytes = header.ToByteArray();
 
-        // Random ephemeral key
+        // Random ephemeral key (no pre-obfuscation; ObfuscateHeaderX below handles it in the correct position)
         var ephKey = BufUtils.RandomBytes(32);
-        var obfuscatedKey = SSU2HeaderEncryption.ObfuscateEphemeralKey(ephKey, introKey);
 
         // AEAD Payload
         var iv = BufUtils.RandomBytes(12);
@@ -1006,7 +1005,7 @@ public class SSU2RelayHandler
         // IV2 is at the very end
         var packet = new byte[32 + 32 + encryptedPayload.Length + 24];
         Array.Copy(headerBytes, 0, packet, 0, 32);
-        Array.Copy(obfuscatedKey, 0, packet, 32, 32);
+        Array.Copy(ephKey, 0, packet, 32, 32);
         Array.Copy(encryptedPayload, 0, packet, 64, encryptedPayload.Length);
 
         // Random IV1 at len-24
@@ -1015,8 +1014,11 @@ public class SSU2RelayHandler
         // IV2 (used for AEAD) at len-12
         Array.Copy(iv, 0, packet, packet.Length - 12, 12);
 
-        // Encrypt header
-        SSU2HeaderEncryption.EncryptLongHeaderComplete(packet, 0, introKey, introKey);
+        // Step 1: Encrypt bytes 0-15 using IVs from packet end
+        SSU2HeaderEncryption.EncryptLongHeaderInPacket(packet, 0, introKey, introKey);
+
+        // Step 2: Obfuscate headerX bytes 16-63 (srcConnID+token+ephKey) with a single 48-byte keystream
+        SSU2HeaderEncryption.ObfuscateHeaderX(packet, 16, introKey);
 
         Host.SendPacket(destination, packet);
     }

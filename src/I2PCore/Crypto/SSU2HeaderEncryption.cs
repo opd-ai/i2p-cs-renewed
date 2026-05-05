@@ -170,10 +170,58 @@ public static class SSU2HeaderEncryption
     }
 
     /// <summary>
-    ///     Obfuscate ephemeral key with ChaCha20 (for Session Request/Created)
-    ///     Per spec lines 788-790: Uses k_header_2 with ZERO IV (all zeros nonce)
-    ///     This is part of the header bytes 16-63 encryption
+    ///     Obfuscate/deobfuscate the 48-byte headerX portion of a SessionRequest or SessionCreated packet.
+    ///     Per i2pd SSU2Session.cpp: ChaCha20(headerX, 48, introKey, zeroNonce, headerX)
+    ///     The headerX starts at byte 16 of the long header and contains:
+    ///       srcConnID (8 bytes) + token (8 bytes) + ephemeral key (32 bytes).
+    ///     A single 48-byte ChaCha20 keystream is applied so that:
+    ///       - bytes 0-15 of keystream cover srcConnID+token (packet bytes 16-31)
+    ///       - bytes 16-47 of keystream cover the ephemeral key  (packet bytes 32-63)
+    ///     ChaCha20 is its own inverse, so this method decrypts as well as encrypts.
     /// </summary>
+    /// <param name="packet">Full packet buffer (modified in-place).</param>
+    /// <param name="headerXOffset">Offset within <paramref name="packet"/> where headerX starts (16 for standard long headers).</param>
+    /// <param name="kHeader2">The 32-byte key used for headerX encryption (intro key for SessionRequest; HKDF-derived for SessionCreated).</param>
+    public static void ObfuscateHeaderX(byte[] packet, int headerXOffset, byte[] kHeader2)
+    {
+        if (packet == null || packet.Length < headerXOffset + 48)
+            throw new ArgumentException("Packet too short for 48-byte headerX at the given offset", nameof(packet));
+        if (kHeader2 == null || kHeader2.Length != 32)
+            throw new ArgumentException("k_header_2 must be 32 bytes", nameof(kHeader2));
+
+        var zeroIV = new byte[12];
+        var ks = GenerateChaCha20Mask(kHeader2, zeroIV, 48);
+        for (var i = 0; i < 48; i++)
+            packet[headerXOffset + i] ^= ks[i];
+    }
+
+    /// <summary>
+    ///     Returns the obfuscated (or deobfuscated) first byte of the ephemeral key.
+    ///     The ephemeral key sits at bytes 16-47 of headerX, so its first byte uses
+    ///     keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
+    ///     Used in the sender loop to check whether the obfuscated key is valid
+    ///     (MSB of first obfuscated byte must be 0 per the protocol convention).
+    /// </summary>
+    public static byte GetEphKeyObfuscatedFirstByte(byte ephKeyByte0, byte[] kHeader2)
+    {
+        if (kHeader2 == null || kHeader2.Length != 32)
+            throw new ArgumentException("k_header_2 must be 32 bytes", nameof(kHeader2));
+
+        var zeroIV = new byte[12];
+        var ks = GenerateChaCha20Mask(kHeader2, zeroIV, 17); // only need byte 16
+        return (byte)(ephKeyByte0 ^ ks[16]);
+    }
+
+    /// <summary>
+    ///     Obfuscate ephemeral key with ChaCha20 (for Session Request/Created).
+    ///     NOTE: This legacy method generates a 32-byte keystream starting at offset 0,
+    ///     which is correct only when the ephemeral key is at the START of headerX (offset 0).
+    ///     For standard SSU2 long headers, use <see cref="ObfuscateHeaderX"/> instead,
+    ///     because the ephemeral key sits at bytes 16-47 of headerX and therefore requires
+    ///     keystream bytes 16-47 (not 0-31).
+    ///     Kept for reference and backward compatibility; not used in production handshake paths.
+    /// </summary>
+    [Obsolete("Use ObfuscateHeaderX for SSU2 SessionRequest/SessionCreated packets.")]
     public static byte[] ObfuscateEphemeralKey(byte[] ephemeralKey, byte[] kHeader2)
     {
         if (ephemeralKey == null || ephemeralKey.Length != 32)
@@ -181,10 +229,7 @@ public static class SSU2HeaderEncryption
         if (kHeader2 == null || kHeader2.Length != 32)
             throw new ArgumentException("k_header_2 must be 32 bytes", nameof(kHeader2));
 
-        // Per spec: IV is zero for ephemeral key obfuscation
         var zeroIV = new byte[12];
-
-        // Generate ChaCha20 keystream and XOR with ephemeral key
         var mask = GenerateChaCha20Mask(kHeader2, zeroIV, 32);
         var obfuscated = new byte[32];
         for (var i = 0; i < 32; i++) obfuscated[i] = (byte)(ephemeralKey[i] ^ mask[i]);
@@ -193,11 +238,15 @@ public static class SSU2HeaderEncryption
     }
 
     /// <summary>
-    ///     Deobfuscate ephemeral key (ChaCha20 is symmetric)
+    ///     Deobfuscate ephemeral key (ChaCha20 is symmetric).
+    ///     See <see cref="ObfuscateEphemeralKey"/> for the same caveat.
     /// </summary>
+    [Obsolete("Use ObfuscateHeaderX for SSU2 SessionRequest/SessionCreated packets.")]
     public static byte[] DeobfuscateEphemeralKey(byte[] obfuscatedKey, byte[] kHeader2)
     {
+#pragma warning disable CS0618
         return ObfuscateEphemeralKey(obfuscatedKey, kHeader2);
+#pragma warning restore CS0618
     }
 
     /// <summary>

@@ -425,24 +425,63 @@ public class SSU2ProtocolTest
     }
 
     /// <summary>
-    ///     Test ephemeral key obfuscation/deobfuscation round-trip.
-    ///     Per i2pd: ephemeral keys are XOR'd with ChaCha20 keystream.
+    ///     Test headerX obfuscation/deobfuscation round-trip.
+    ///     Per i2pd: the 48-byte headerX (srcConnID+token+ephKey) is XOR'd with a single
+    ///     ChaCha20 keystream via ObfuscateHeaderX.  ChaCha20 is self-inverse, so calling
+    ///     ObfuscateHeaderX twice on the same data restores the original.
     /// </summary>
     [Test]
-    public void TestEphemeralKeyObfuscation()
+    public void TestHeaderXObfuscationRoundTrip()
     {
-        var ephemeralKey = BufUtils.RandomBytes(32);
+        // Build a 64-byte packet: 16-byte first header + 48-byte headerX (srcConnID+token+ephKey)
+        var packet = BufUtils.RandomBytes(80); // 32 header + 48 payload (need 24+ bytes after for IV)
+        var original = (byte[])packet.Clone();
         var headerKey = BufUtils.RandomBytes(32);
 
-        var obfuscated = SSU2HeaderEncryption.ObfuscateEphemeralKey(ephemeralKey, headerKey);
-        Assert.IsNotNull(obfuscated);
-        Assert.AreEqual(32, obfuscated.Length);
-        Assert.IsFalse(BufUtils.Equal(ephemeralKey, obfuscated),
-            "Obfuscated key should differ from original");
+        // Obfuscate headerX (bytes 16-63)
+        SSU2HeaderEncryption.ObfuscateHeaderX(packet, 16, headerKey);
 
-        var deobfuscated = SSU2HeaderEncryption.DeobfuscateEphemeralKey(obfuscated, headerKey);
-        Assert.IsTrue(BufUtils.Equal(ephemeralKey, deobfuscated),
-            "Deobfuscated key should match original");
+        // Bytes 16-63 should have changed
+        var anyChanged = false;
+        for (var i = 16; i < 64; i++)
+            if (packet[i] != original[i])
+                anyChanged = true;
+        Assert.IsTrue(anyChanged, "Obfuscation should change headerX bytes");
+
+        // Bytes 0-15 should be unchanged (ObfuscateHeaderX only touches 16-63)
+        for (var i = 0; i < 16; i++)
+            Assert.AreEqual(original[i], packet[i], $"ObfuscateHeaderX must not change byte {i}");
+
+        // Deobfuscate (ChaCha20 is self-inverse)
+        SSU2HeaderEncryption.ObfuscateHeaderX(packet, 16, headerKey);
+
+        for (var i = 16; i < 64; i++)
+            Assert.AreEqual(original[i], packet[i], $"HeaderX deobfuscation round-trip failed at byte {i}");
+    }
+
+    /// <summary>
+    ///     Verifies that the ephemeral key within a headerX packet is obfuscated using
+    ///     keystream bytes 16-47 (not 0-31).  Specifically confirms alignment with i2pd's
+    ///     single 48-byte ChaCha20 call on headerX.
+    /// </summary>
+    [Test]
+    public void TestEphemeralKeyUsesCorrectKeystreamOffset()
+    {
+        var introKey = BufUtils.RandomBytes(32);
+
+        // Build a minimal long-header packet (32-byte header + 32-byte ephKey + 16-byte payload)
+        var packet = new byte[80];
+        var ephKey = BufUtils.RandomBytes(32);
+        Array.Copy(ephKey, 0, packet, 32, 32); // Place plain ephKey at bytes 32-63
+
+        SSU2HeaderEncryption.ObfuscateHeaderX(packet, 16, introKey);
+
+        // The obfuscated ephemeral key at bytes 32-63 should equal ephKey XOR ks[16:48]
+        // where ks is the ChaCha20(introKey, zeroNonce, 48) keystream.
+        // The GetEphKeyObfuscatedFirstByte helper uses ks[16] — verify it matches packet[32].
+        var expectedObfFirstByte = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(ephKey[0], introKey);
+        Assert.AreEqual(expectedObfFirstByte, packet[32],
+            "First byte of obfuscated ephKey must use keystream byte 16 (not 0)");
     }
 
     /// <summary>

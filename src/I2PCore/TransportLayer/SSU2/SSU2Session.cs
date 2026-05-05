@@ -495,9 +495,8 @@ public class SSU2Session : ITransport
         // Build payload
         var payload = BuildRequestPayload();
 
-        // Generate ephemeral keys
+        // Generate ephemeral keys; loop until the obfuscated first byte has MSB=0
         byte[] ephKey;
-        byte[] obfuscatedKey;
         var attempts = 0;
 
         while (true)
@@ -509,10 +508,11 @@ public class SSU2Session : ITransport
             if (IsPQ) ephKey[31] |= 0x80;
             else ephKey[31] &= 0x7f;
 
-            // Obfuscate key
-            obfuscatedKey = SSU2HeaderEncryption.ObfuscateEphemeralKey(ephKey, kHeader2);
+            // The ephemeral key occupies bytes 16-47 of headerX, so its obfuscated first byte
+            // uses keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
+            var obfFirstByte = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(ephKey[0], kHeader2);
 
-            if ((obfuscatedKey[0] & 0x80) == 0 && (IsPQ || (ephKey[31] & 0x80) == 0))
+            if ((obfFirstByte & 0x80) == 0 && (IsPQ || (ephKey[31] & 0x80) == 0))
                 break;
 
             if (attempts > 100)
@@ -522,15 +522,20 @@ public class SSU2Session : ITransport
         // Use Noise to create message 1 WITH HEADER (SSU2-specific)
         var (_, encryptedPayload) = NoiseState.CreateMessage1WithHeaderAndCurrentKeys(headerBytes, payload);
 
-        // Build complete packet
-        var packet = new byte[headerBytes.Length + obfuscatedKey.Length + encryptedPayload.Length];
+        // Build complete packet: long header (32 bytes) + plain ephKey (32 bytes) + encrypted payload.
+        // Header encryption is applied in two separate steps below to match i2pd's layout exactly:
+        //   1. Bytes  0-15 (destConnID+pktNum+type+flags): XOR with ChaCha20 masks derived from packet end.
+        //   2. Bytes 16-63 (srcConnID+token+ephKey, the "headerX"): single 48-byte ChaCha20(kHeader2, zeroIV).
+        var packet = new byte[headerBytes.Length + ephKey.Length + encryptedPayload.Length];
         Array.Copy(headerBytes, 0, packet, 0, headerBytes.Length);
-        Array.Copy(obfuscatedKey, 0, packet, headerBytes.Length, obfuscatedKey.Length);
-        Array.Copy(encryptedPayload, 0, packet, headerBytes.Length + obfuscatedKey.Length,
-            encryptedPayload.Length);
+        Array.Copy(ephKey, 0, packet, headerBytes.Length, ephKey.Length);
+        Array.Copy(encryptedPayload, 0, packet, headerBytes.Length + ephKey.Length, encryptedPayload.Length);
 
-        // Encrypt header in place using IVs from packet end
+        // Step 1: Encrypt bytes 0-15 using IVs from packet end
         SSU2HeaderEncryption.EncryptLongHeaderInPacket(packet, 0, kHeader1, kHeader2);
+
+        // Step 2: Obfuscate headerX bytes 16-63 (srcConnID+token+ephKey) with a single 48-byte keystream
+        SSU2HeaderEncryption.ObfuscateHeaderX(packet, 16, kHeader2);
 
         // Send via host
         Host.SendPacket(RemoteEndpoint, packet);
@@ -598,7 +603,9 @@ public class SSU2Session : ITransport
 
             // SSU2 spec: for SessionRequest, k_header_1 = k_header_2 = Bob's intro key.
             // For others, it's more complex, but we can peek the type after decrypting with intro key.
-            SSU2HeaderEncryption.DecryptLongHeaderComplete(trialDecrypted, 0, kHeader1, kHeader2);
+            // We only need the type byte (at offset 12 in the long header) so DecryptLongHeaderInPacket
+            // (which decrypts only bytes 0-15) is sufficient for this trial peek.
+            SSU2HeaderEncryption.DecryptLongHeaderInPacket(trialDecrypted, 0, kHeader1, kHeader2);
 
             var reader = new I2PBufferCursor(trialDecrypted);
             var header = SSU2Header.ParseLongHeader(reader);
@@ -682,10 +689,16 @@ public class SSU2Session : ITransport
         var kHeader1 = ourIntroKey;
         var kHeader2 = ourIntroKey;
 
-        // Decrypt header in place using IVs from packet end
-        SSU2HeaderEncryption.DecryptLongHeaderComplete(packetData, 0, kHeader1, kHeader2);
+        // Decrypt the first 16 bytes of the long header using IVs from packet end.
+        // (Bytes 16-63 — srcConnID + token + ephemeral key — are handled as "headerX" below.)
+        SSU2HeaderEncryption.DecryptLongHeaderInPacket(packetData, 0, kHeader1, kHeader2);
 
-        // Parse header (now decrypted in packetData)
+        // Deobfuscate headerX: bytes 16-63 (srcConnID+token+ephKey) with a single 48-byte ChaCha20 keystream.
+        // Per i2pd SSU2Session.cpp: ChaCha20(headerX, 48, introKey, zeroNonce, headerX)
+        // This is the inverse of what ObfuscateHeaderX does in SendSessionRequest (ChaCha20 is its own inverse).
+        SSU2HeaderEncryption.ObfuscateHeaderX(packetData, 16, kHeader2);
+
+        // Parse header (now fully decrypted in packetData, bytes 0-31)
         var headerReader = new I2PBufferCursor(packetData);
         var header = SSU2Header.ParseLongHeader(headerReader);
 
@@ -713,12 +726,9 @@ public class SSU2Session : ITransport
         RemoteConnectionId = header.SourceConnectionId;
         LocalConnectionId = header.DestinationConnectionId;
 
-        // Extract obfuscated ephemeral key (bytes 32-63)
-        var obfuscatedEphKey = new byte[32];
-        Array.Copy(packetData, 32, obfuscatedEphKey, 0, 32);
-
-        // Deobfuscate ephemeral key
-        var ephemeralKey = SSU2HeaderEncryption.DeobfuscateEphemeralKey(obfuscatedEphKey, kHeader2);
+        // Extract ephemeral key from bytes 32-63 (already deobfuscated by ObfuscateHeaderX above)
+        var ephemeralKey = new byte[32];
+        Array.Copy(packetData, 32, ephemeralKey, 0, 32);
 
         // Check replay cache (spec lines 1207-1213)
         if (!SSU2SecurityValidator.CheckAndAddToReplayCache(ephemeralKey))
@@ -823,10 +833,15 @@ public class SSU2Session : ITransport
         var chainingKey = NoiseState.GetChainingKey();
         var kHeader2 = SSU2HeaderEncryption.DeriveSessionCreatedHeaderKey(chainingKey);
 
-        // Decrypt header in place using IVs from packet end
-        SSU2HeaderEncryption.DecryptLongHeaderComplete(packetData, 0, kHeader1, kHeader2);
+        // Decrypt the first 16 bytes of the long header using IVs from packet end.
+        // (Bytes 16-63 — srcConnID + token + ephemeral key — are handled as "headerX" below.)
+        SSU2HeaderEncryption.DecryptLongHeaderInPacket(packetData, 0, kHeader1, kHeader2);
 
-        // Parse header (now decrypted in packetData)
+        // Deobfuscate headerX: bytes 16-63 (srcConnID+token+ephKey) with a single 48-byte ChaCha20 keystream.
+        // Per i2pd SSU2Session.cpp: ChaCha20(headerX, 48, kh2, zeroNonce, headerX)
+        SSU2HeaderEncryption.ObfuscateHeaderX(packetData, 16, kHeader2);
+
+        // Parse header (now fully decrypted in packetData, bytes 0-31)
         var headerReader = new I2PBufferCursor(packetData);
         var header = SSU2Header.ParseLongHeader(headerReader);
 
@@ -846,12 +861,9 @@ public class SSU2Session : ITransport
         RemoteConnectionId = header.SourceConnectionId;
         Logging.LogDebug($"{DebugId}: Got remote connection ID: {RemoteConnectionId:X16}");
 
-        // Extract obfuscated ephemeral key (bytes 32-63)
-        var obfuscatedEphKey = new byte[32];
-        Array.Copy(packetData, 32, obfuscatedEphKey, 0, 32);
-
-        // Deobfuscate ephemeral key
-        var ephemeralKey = SSU2HeaderEncryption.DeobfuscateEphemeralKey(obfuscatedEphKey, kHeader2);
+        // Extract ephemeral key from bytes 32-63 (already deobfuscated by ObfuscateHeaderX above)
+        var ephemeralKey = new byte[32];
+        Array.Copy(packetData, 32, ephemeralKey, 0, 32);
 
         // Extract encrypted payload (rest of packet)
         var encryptedPayloadLen = packetData.Length - 64;
@@ -1413,9 +1425,11 @@ public class SSU2Session : ITransport
             if (IsPQ) ephKey[31] |= 0x80;
             else ephKey[31] &= 0x7f;
 
-            var obfuscatedKey = SSU2HeaderEncryption.ObfuscateEphemeralKey(ephKey, kHeader2);
+            // The ephemeral key occupies bytes 16-47 of headerX, so its obfuscated first byte
+            // uses keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
+            var obfFirstByte = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(ephKey[0], kHeader2);
 
-            if ((obfuscatedKey[0] & 0x80) == 0 && (IsPQ || (ephKey[31] & 0x80) == 0))
+            if ((obfFirstByte & 0x80) == 0 && (IsPQ || (ephKey[31] & 0x80) == 0))
             {
                 // If PQ session, encapsulate KEM and include ciphertext
                 if (IsPQ && RemoteKemPublicKey != null)
@@ -1448,14 +1462,21 @@ public class SSU2Session : ITransport
                 // Create message 2
                 var (_, encryptedPayload) = NoiseState.CreateMessage2WithHeaderAndCurrentKeys(headerBytes, payload);
 
-                packet = new byte[headerBytes.Length + obfuscatedKey.Length + encryptedPayload.Length];
+                // Build complete packet: long header (32 bytes) + plain ephKey (32 bytes) + encrypted payload.
+                // Apply header encryption in two steps to match i2pd exactly:
+                //   1. Bytes  0-15: XOR with ChaCha20 masks derived from packet end.
+                //   2. Bytes 16-63: single 48-byte ChaCha20(kHeader2, zeroIV) over srcConnID+token+ephKey.
+                packet = new byte[headerBytes.Length + ephKey.Length + encryptedPayload.Length];
                 Array.Copy(headerBytes, 0, packet, 0, headerBytes.Length);
-                Array.Copy(obfuscatedKey, 0, packet, headerBytes.Length, obfuscatedKey.Length);
-                Array.Copy(encryptedPayload, 0, packet, headerBytes.Length + obfuscatedKey.Length,
+                Array.Copy(ephKey, 0, packet, headerBytes.Length, ephKey.Length);
+                Array.Copy(encryptedPayload, 0, packet, headerBytes.Length + ephKey.Length,
                     encryptedPayload.Length);
 
-                // Encrypt header in place
+                // Step 1: Encrypt bytes 0-15 using IVs from packet end
                 SSU2HeaderEncryption.EncryptLongHeaderInPacket(packet, 0, kHeader1, kHeader2);
+
+                // Step 2: Obfuscate headerX bytes 16-63 (srcConnID+token+ephKey) with a single 48-byte keystream
+                SSU2HeaderEncryption.ObfuscateHeaderX(packet, 16, kHeader2);
             }
             else if (attempts > 100)
             {
