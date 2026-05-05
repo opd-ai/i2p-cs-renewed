@@ -340,7 +340,7 @@ public class RouterService
             var destHash = tunnel.Destination;
 
             // Extract ReceiveFrom (previous hop) from the specific tunnel type
-            I2PIdentHash receiveFrom = null;
+            I2PIdentHash? receiveFrom = null;
             if (tunnel is TransitTunnel tt) receiveFrom = tt.ReceiveFrom;
             else if (tunnel is EndpointTunnel et) receiveFrom = et.ReceiveFrom;
             else if (tunnel is GatewayTunnel gt) receiveFrom = gt.ReceiveFrom;

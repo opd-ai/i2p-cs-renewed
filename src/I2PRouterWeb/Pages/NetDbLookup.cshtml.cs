@@ -70,7 +70,7 @@ public class NetDbLookupModel : PageModel
 
         // Resolve selected tunnel pool to a ClientDestination (null = exploratory)
         var useDirectQueries = TunnelPool == "direct";
-        ClientDestination clientContext = null;
+        ClientDestination? clientContext = null;
 
         if (TunnelPool == "__httpproxy__")
         {
@@ -98,7 +98,7 @@ public class NetDbLookupModel : PageModel
             var identHash = new I2PIdentHash(addr);
 
             // Check cache first (global NetDb for exploratory/direct, client session for tunnel pools)
-            ILeaseSet cachedLs = null;
+            ILeaseSet? cachedLs = null;
             if (clientContext != null)
                 cachedLs = clientContext.MySessions.GetLeaseSet(identHash);
             else
@@ -116,15 +116,15 @@ public class NetDbLookupModel : PageModel
             var tcs = new TaskCompletionSource<(ILeaseSet? ls, IdentResolver.IdentUpdateRequestInfo? info)>();
 
             // Subscribe to the LeaseSet event temporarily
-            IdentResolver.IdentResolverResultLeaseSetEx successHandler = null;
-            IdentResolver.IdentResolverResultFailEx failHandler = null;
+            IdentResolver.IdentResolverResultLeaseSetEx? successHandler = null;
+            IdentResolver.IdentResolverResultFailEx? failHandler = null;
 
             successHandler = (ls, info) =>
             {
                 if (ls?.Destination?.IdentHash == identHash)
                 {
-                    NetDb.Inst.IdentHashLookup.LeaseSetReceivedEx -= successHandler;
-                    NetDb.Inst.IdentHashLookup.LookupFailureEx -= failHandler;
+                    NetDb.Inst?.IdentHashLookup.LeaseSetReceivedEx -= successHandler;
+                    NetDb.Inst?.IdentHashLookup.LookupFailureEx -= failHandler;
                     tcs.TrySetResult((ls, info));
                 }
             };
@@ -133,15 +133,15 @@ public class NetDbLookupModel : PageModel
             {
                 if (key == identHash)
                 {
-                    NetDb.Inst.IdentHashLookup.LeaseSetReceivedEx -= successHandler;
-                    NetDb.Inst.IdentHashLookup.LookupFailureEx -= failHandler;
+                    NetDb.Inst?.IdentHashLookup.LeaseSetReceivedEx -= successHandler;
+                    NetDb.Inst?.IdentHashLookup.LookupFailureEx -= failHandler;
                     tcs.TrySetResult((null, info));
                 }
             };
 
-            NetDb.Inst.IdentHashLookup.LeaseSetReceivedEx += successHandler;
-            NetDb.Inst.IdentHashLookup.LookupFailureEx += failHandler;
-            NetDb.Inst.IdentHashLookup.LookupLeaseSet(identHash, clientContext, ParallelQueries, useDirectQueries);
+            NetDb.Inst?.IdentHashLookup.LeaseSetReceivedEx += successHandler;
+            NetDb.Inst?.IdentHashLookup.LookupFailureEx += failHandler;
+            NetDb.Inst?.IdentHashLookup.LookupLeaseSet(identHash, clientContext, ParallelQueries, useDirectQueries);
 
             // Wait up to 30 seconds
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -166,7 +166,7 @@ public class NetDbLookupModel : PageModel
             catch (OperationCanceledException)
             {
                 sw.Stop();
-                var info = NetDb.Inst.IdentHashLookup.GetQueryInfo(identHash);
+                var info = NetDb.Inst?.IdentHashLookup.GetQueryInfo(identHash);
                 Result = BuildResult(null, sw.ElapsedMilliseconds, identHash, info);
 
                 // Check if lookup failed due to no tunnels being available

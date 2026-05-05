@@ -59,7 +59,7 @@ public class ECIESTunnelDecrypt
         for (var i = 0; i < message.Records.Count; i++)
         {
             var encryptedRecord = message.Records[i];
-            if (encryptedRecord == null || encryptedRecord.Length != ShortBuildRequestRecord.OnWireRecordSize)
+            if (encryptedRecord.IsEmpty || encryptedRecord.Length != ShortBuildRequestRecord.OnWireRecordSize)
                 continue;
 
             // Java BuildMessageProcessor.java: fast routing prefix check.
@@ -139,7 +139,7 @@ public class ECIESTunnelDecrypt
     /// </summary>
     public LongBuildRequestRecord DecryptLongRecord(I2PByteBlock encryptedRecord)
     {
-        if (encryptedRecord == null || encryptedRecord.Length != LongBuildRequestRecord.EncryptedRecordSize)
+        if (encryptedRecord.IsEmpty || encryptedRecord.Length != LongBuildRequestRecord.EncryptedRecordSize)
             throw new ArgumentException(
                 $"Encrypted record must be {LongBuildRequestRecord.EncryptedRecordSize} bytes",
                 nameof(encryptedRecord));

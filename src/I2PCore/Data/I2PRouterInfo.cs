@@ -131,7 +131,7 @@ public class I2PRouterInfo : I2PType
             result.AppendLine("Signature    : member (null)");
         else
             result.AppendLine("Signature    : " +
-                              (Signature.Sig == null ? "(null)" : " [" + Signature.Sig.Length + "] " + Signature));
+                              (Signature.Sig.IsEmpty ? "(null)" : " [" + Signature.Sig.Length + "] " + Signature));
 
         return result.ToString();
     }
