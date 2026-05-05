@@ -374,7 +374,7 @@ public class StreamingProtocolTest
             return;
         }
 
-        var windowBefore = stream.CurrentWindowSize;
+        var windowBeforeNack = stream.CurrentWindowSize;
 
         // Send an ACK for the first packet with a NACK for the second
         var ackPkt = new StreamingPacket
@@ -389,8 +389,8 @@ public class StreamingProtocolTest
         stream.HandleNextPacket(ackPkt);
 
         // Window must not grow on a NACK — it should stay the same or drop
-        Assert.LessOrEqual(stream.CurrentWindowSize, windowBefore,
-            $"Window ({stream.CurrentWindowSize}) must not grow after a NACK (was {windowBefore})");
+        Assert.LessOrEqual(stream.CurrentWindowSize, windowBeforeNack,
+            $"Window ({stream.CurrentWindowSize}) must not grow after a NACK (was {windowBeforeNack})");
 
         // Window must remain at least MIN_WINDOW_SIZE
         Assert.GreaterOrEqual(stream.CurrentWindowSize, I2PStream.MIN_WINDOW_SIZE,
@@ -457,9 +457,10 @@ public class StreamingProtocolTest
     {
         var (stream, _) = CreateOpenStream();
 
-        // Initial window should be INITIAL_WINDOW_SIZE (plus slow-start bump from SYN/ACK)
+        // After SYN/ACK in CreateOpenStream, slow-start increases window by 1.
+        // So the window may already be INITIAL_WINDOW_SIZE+1 here.
         Assert.GreaterOrEqual(stream.CurrentWindowSize, I2PStream.INITIAL_WINDOW_SIZE,
-            "Initial window must be at least INITIAL_WINDOW_SIZE");
+            $"Post-SYN/ACK window ({stream.CurrentWindowSize}) must be at least INITIAL_WINDOW_SIZE ({I2PStream.INITIAL_WINDOW_SIZE})");
 
         var sentSeqs = new List<uint>();
         stream.PacketSent += (_, seq, _) => sentSeqs.Add(seq);
