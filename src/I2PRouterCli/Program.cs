@@ -40,7 +40,7 @@ internal class Program
         var httpProxyPort = 4445; // Default to 4445 (4444 might be in use)
 
         var hiddenMode = false;
-        string dataDir = null;
+        string? dataDir = null;
         var netId = 0; // 0 = use default (2)
         var disableReseed = false;
         var samPort = 0; // 0 = use default

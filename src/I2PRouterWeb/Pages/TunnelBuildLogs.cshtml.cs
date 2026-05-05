@@ -5,7 +5,7 @@ namespace I2PRouterWeb.Pages;
 
 public class TunnelBuildLogsModel : PageModel
 {
-    public IEnumerable<TunnelBuildLogger.LogEntry> LogEntries { get; private set; }
+    public IEnumerable<TunnelBuildLogger.LogEntry> LogEntries { get; private set; } = Enumerable.Empty<TunnelBuildLogger.LogEntry>();
 
     public void OnGet()
     {
