@@ -47,12 +47,14 @@ public class SessionCreated
         // Decrypt the first 16 bytes using IVs from packet end (bytes 0-15 only)
         SSU2HeaderEncryption.DecryptLongHeaderInPacket(fullPacket, 0, kHeader1, kHeader2);
 
-        // Parse decrypted header from packet
-        created.Header = SSU2Header.ParseLongHeader(new I2PBufferCursor(fullPacket));
-
         // Deobfuscate headerX: bytes 16-63 (srcConnID+token+ephKey) using a single 48-byte ChaCha20 keystream.
         // Per i2pd: ChaCha20(headerX, 48, kh2, zeroNonce, headerX)
+        // Must be done BEFORE ParseLongHeader so SourceConnectionId (bytes 16-23) and Token (bytes 24-31)
+        // are deobfuscated before being read.
         SSU2HeaderEncryption.ObfuscateHeaderX(fullPacket, 16, kHeader2);
+
+        // Parse decrypted header from packet (bytes 0-31 are now fully plain)
+        created.Header = SSU2Header.ParseLongHeader(new I2PBufferCursor(fullPacket));
 
         // Extract ephemeral key Y from bytes 32-63 (now deobfuscated)
         created.EphemeralKey = new byte[32];

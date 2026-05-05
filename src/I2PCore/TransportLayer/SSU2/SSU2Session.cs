@@ -495,7 +495,10 @@ public class SSU2Session : ITransport
         // Build payload
         var payload = BuildRequestPayload();
 
-        // Generate ephemeral keys; loop until the obfuscated first byte has MSB=0
+        // Generate ephemeral keys; loop until the obfuscated first byte has MSB=0.
+        // Precompute the headerX mask byte once: it depends only on kHeader2 (constant per session)
+        // and does not change between attempts.
+        var ephKeyMaskByte = SSU2HeaderEncryption.GetEphKeyMaskByte(kHeader2);
         byte[] ephKey;
         var attempts = 0;
 
@@ -510,9 +513,7 @@ public class SSU2Session : ITransport
 
             // The ephemeral key occupies bytes 16-47 of the 48-byte headerX region (packet bytes 32-63),
             // so its obfuscated first byte uses keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
-            var obfFirstByte = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(ephKey[0], kHeader2);
-
-            if ((obfFirstByte & 0x80) == 0 && (IsPQ || (ephKey[31] & 0x80) == 0))
+            if (EphKeyFirstByteIsValid(ephKey[0], ephKeyMaskByte) && (IsPQ || (ephKey[31] & 0x80) == 0))
                 break;
 
             if (attempts > 100)
@@ -599,28 +600,64 @@ public class SSU2Session : ITransport
             // We need to try long header decryption first.
             var trialDecrypted = (byte[])packetData.Clone();
             var kHeader1 = IsOutgoing ? GetRemoteIntroKey() : Host.GetMyIntroKey();
-            var kHeader2 = kHeader1; // Initial default for trial
 
-            // SSU2 spec: for SessionRequest, k_header_1 = k_header_2 = Bob's intro key.
-            // For others, it's more complex, but we can peek the type after decrypting with intro key.
-            // We only need the type byte (at offset 12 in the long header) so DecryptLongHeaderInPacket
-            // (which decrypts only bytes 0-15) is sufficient for this trial peek.
+            // Choose kHeader2 based on handshake state because bytes 8-15 (which contain the type byte
+            // at offset 12) are encrypted with kHeader2 and each message type uses a different derivation:
+            //   SessionRequest:   kHeader2 = introKey (no derivation)
+            //   SessionCreated:   kHeader2 = HKDF(chainKey, ZEROLEN, "SessCreateHeader", 32)
+            //   SessionConfirmed: SHORT header — handled separately below
+            byte[] kHeader2;
+            switch (State)
+            {
+                case SessionState.SessionRequestSent:
+                {
+                    // Alice is expecting SessionCreated; derive the correct k_header_2.
+                    var chainKey = NoiseState.GetChainingKey();
+                    if (chainKey == null || chainKey.Length != 32)
+                        throw new InvalidOperationException(
+                            $"{DebugId}: Noise chaining key unavailable or invalid in state {State}");
+                    kHeader2 = SSU2HeaderEncryption.DeriveSessionCreatedHeaderKey(chainKey);
+                    break;
+                }
+                case SessionState.SessionCreatedSent:
+                {
+                    // Bob is expecting SessionConfirmed (SHORT header); derive k_header_2 for use
+                    // in the short-header fallback below.
+                    var chainKey = NoiseState.GetChainingKey();
+                    if (chainKey == null || chainKey.Length != 32)
+                        throw new InvalidOperationException(
+                            $"{DebugId}: Noise chaining key unavailable or invalid in state {State}");
+                    kHeader2 = SSU2HeaderEncryption.DeriveSessionConfirmedHeaderKey(chainKey);
+                    break;
+                }
+                default:
+                    // SessionRequest (and anything before handshake starts): kHeader2 = introKey.
+                    kHeader2 = kHeader1;
+                    break;
+            }
+
             SSU2HeaderEncryption.DecryptLongHeaderInPacket(trialDecrypted, 0, kHeader1, kHeader2);
 
             var reader = new I2PBufferCursor(trialDecrypted);
             var header = SSU2Header.ParseLongHeader(reader);
             var type = header.Type;
 
-            // If trial decryption with intro key didn't yield a valid long header type,
-            // it might be a data packet (short header).
+            // If trial decryption with long-header keys didn't yield a valid type, try short header.
             if (type > 2 && type != SSU2Header.TYPE_DATA)
             {
-                // Try short header decryption if established
                 if (State == SessionState.Established)
                 {
+                    // Data phase: decrypt with established receive header key
                     var shortDecrypted = (byte[])packetData.Clone();
-                    SSU2HeaderEncryption.DecryptShortHeader(shortDecrypted, ReceiveHeaderKey2);
-                    type = shortDecrypted[12]; // Type at offset 12 in short header
+                    SSU2HeaderEncryption.DecryptShortHeaderInPacket(shortDecrypted, 0, kHeader1, ReceiveHeaderKey2);
+                    type = shortDecrypted[12];
+                }
+                else if (State == SessionState.SessionCreatedSent)
+                {
+                    // SessionConfirmed uses a short header; kHeader2 was derived from chaining key above.
+                    var shortDecrypted = (byte[])packetData.Clone();
+                    SSU2HeaderEncryption.DecryptShortHeaderInPacket(shortDecrypted, 0, kHeader1, kHeader2);
+                    type = shortDecrypted[12];
                 }
             }
 
@@ -1410,6 +1447,10 @@ public class SSU2Session : ITransport
         var chainingKeyBeforeMsg2 = NoiseState.GetChainingKey();
         var kHeader2 = SSU2HeaderEncryption.DeriveSessionCreatedHeaderKey(chainingKeyBeforeMsg2);
 
+        // Precompute the headerX mask byte once: it depends only on kHeader2 (constant per session)
+        // and does not change between attempts.
+        var ephKeyMaskByte = SSU2HeaderEncryption.GetEphKeyMaskByte(kHeader2);
+
         while (packet == null)
         {
             attempts++;
@@ -1427,9 +1468,7 @@ public class SSU2Session : ITransport
 
             // The ephemeral key occupies bytes 16-47 of the 48-byte headerX region (packet bytes 32-63),
             // so its obfuscated first byte uses keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
-            var obfFirstByte = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(ephKey[0], kHeader2);
-
-            if ((obfFirstByte & 0x80) == 0 && (IsPQ || (ephKey[31] & 0x80) == 0))
+            if (EphKeyFirstByteIsValid(ephKey[0], ephKeyMaskByte) && (IsPQ || (ephKey[31] & 0x80) == 0))
             {
                 // If PQ session, encapsulate KEM and include ciphertext
                 if (IsPQ && RemoteKemPublicKey != null)
@@ -1727,6 +1766,13 @@ public class SSU2Session : ITransport
             }
         }
     }
+
+    /// <summary>
+    ///     Returns true if the ephemeral key's first byte, when obfuscated with the given mask byte,
+    ///     has its MSB clear — the protocol requirement for a valid SSU2 ephemeral key.
+    /// </summary>
+    private static bool EphKeyFirstByteIsValid(byte ephKeyFirstByte, byte maskByte)
+        => ((ephKeyFirstByte ^ maskByte) & 0x80) == 0;
 }
 
 public enum SessionState

@@ -196,6 +196,24 @@ public static class SSU2HeaderEncryption
     }
 
     /// <summary>
+    ///     Returns keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
+    ///     This is the mask byte applied to the ephemeral key's first byte when obfuscating headerX.
+    ///     Callers should invoke this ONCE before a retry loop and reuse the result, since
+    ///     the keystream depends only on kHeader2 (constant per session) and is not affected
+    ///     by the generated ephemeral key itself.
+    ///     Note: Internally allocates a 17-byte keystream to reach byte 16; only one byte is returned.
+    /// </summary>
+    public static byte GetEphKeyMaskByte(byte[] kHeader2)
+    {
+        if (kHeader2 == null || kHeader2.Length != 32)
+            throw new ArgumentException("k_header_2 must be 32 bytes", nameof(kHeader2));
+
+        var zeroIV = new byte[12];
+        var ks = GenerateChaCha20Mask(kHeader2, zeroIV, 17); // only need byte 16
+        return ks[16];
+    }
+
+    /// <summary>
     ///     Returns the obfuscated (or deobfuscated) first byte of the ephemeral key.
     ///     The ephemeral key sits at bytes 16-47 of headerX, so its first byte uses
     ///     keystream byte 16 of ChaCha20(kHeader2, zeroNonce).

@@ -485,6 +485,28 @@ public class SSU2ProtocolTest
     }
 
     /// <summary>
+    ///     Verifies that GetEphKeyMaskByte is equivalent to GetEphKeyObfuscatedFirstByte(0, key)
+    ///     and that precomputing it once gives the same result as calling per-iteration.
+    /// </summary>
+    [Test]
+    public void TestGetEphKeyMaskByteEquivalence()
+    {
+        var kHeader2 = BufUtils.RandomBytes(32);
+
+        // GetEphKeyMaskByte should equal GetEphKeyObfuscatedFirstByte(0, kHeader2) = 0 ^ ks[16] = ks[16]
+        var maskByte = SSU2HeaderEncryption.GetEphKeyMaskByte(kHeader2);
+        var obfOfZero = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(0, kHeader2);
+        Assert.AreEqual(obfOfZero, maskByte, "GetEphKeyMaskByte must equal GetEphKeyObfuscatedFirstByte(0, key)");
+
+        // Verify the mask byte correctly obfuscates an arbitrary first byte
+        var ephByte0 = (byte)0x42;
+        var expectedObf = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(ephByte0, kHeader2);
+        var computedObf = (byte)(ephByte0 ^ maskByte);
+        Assert.AreEqual(expectedObf, computedObf,
+            "Precomputed mask byte should give the same result as per-call GetEphKeyObfuscatedFirstByte");
+    }
+
+    /// <summary>
     ///     Test short header encrypt/decrypt round-trip.
     /// </summary>
     [Test]
@@ -528,5 +550,46 @@ public class SSU2ProtocolTest
         // IPv6: 1500 - 40 - 8 - 32 = 1420
         Assert.AreEqual(1420, SSU2FragmentHandler.MAX_PAYLOAD_SIZE_IPV6,
             "IPv6 max payload should be 1420");
+    }
+
+    /// <summary>
+    ///     Verifies that SessionRequest.Parse() correctly decodes SourceConnectionId and Token
+    ///     (which live in headerX bytes 16-31) by applying ObfuscateHeaderX BEFORE ParseLongHeader.
+    ///     Regression test for the parse-ordering bug where those fields were read from still-obfuscated bytes.
+    /// </summary>
+    [Test]
+    public void TestSessionRequestParseDecodesSrcConnIdAndToken()
+    {
+        var introKey = BufUtils.RandomBytes(32);
+
+        // Manually build a minimal SessionRequest packet (64 bytes header+ephKey, 16 bytes payload)
+        const ulong srcConnId = 0xDEADBEEFCAFEBABE;
+        const ulong token = 0x0102030405060708;
+        var packet = new byte[80]; // 32-byte header + 32-byte ephKey + 16-byte payload
+                                   // The long-header IV takes the last 24 bytes: IV1=packet[56:67], IV2=packet[68:79]
+
+        var writer = new I2PBufferCursor(packet);
+        writer.WriteUInt64BigEndian(0xAAAAAAAAAAAAAAAA); // DestConnectionId
+        writer.WriteUInt32BigEndian(1);                  // PacketNumber
+        writer.WriteByte(SSU2Header.TYPE_SESSION_REQUEST); // Type
+        writer.WriteByte(2);                             // Version
+        writer.WriteByte(2);                             // NetId
+        writer.WriteByte(0);                             // Flag
+        writer.WriteUInt64BigEndian(srcConnId);          // SourceConnectionId — in headerX
+        writer.WriteUInt64BigEndian(token);              // Token — in headerX
+
+        // Apply encryption matching what a sender would do:
+        // Step 1: bytes 0-15
+        SSU2HeaderEncryption.EncryptLongHeaderInPacket(packet, 0, introKey, introKey);
+        // Step 2: headerX bytes 16-63
+        SSU2HeaderEncryption.ObfuscateHeaderX(packet, 16, introKey);
+
+        // Parse via SessionRequest.Parse (which must reverse both steps in the correct order)
+        var req = SessionRequest.Parse(new I2PBufferCursor(packet), introKey, (byte[])packet.Clone());
+
+        Assert.AreEqual(srcConnId, req.Header.SourceConnectionId,
+            "SourceConnectionId must be correctly decoded from deobfuscated headerX");
+        Assert.AreEqual(token, req.Header.Token,
+            "Token must be correctly decoded from deobfuscated headerX");
     }
 }
