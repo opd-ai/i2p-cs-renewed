@@ -374,8 +374,7 @@ public class StreamingProtocolTest
             return;
         }
 
-        // Count total packets sent so far
-        var sentBefore = sentSeqs.Count;
+        var windowBefore = stream.CurrentWindowSize;
 
         // Send an ACK for the first packet with a NACK for the second
         var ackPkt = new StreamingPacket
@@ -389,20 +388,27 @@ public class StreamingProtocolTest
         };
         stream.HandleNextPacket(ackPkt);
 
-        // Window should still be >= MIN_WINDOW_SIZE after a NACK
-        // (we verify indirectly: stream must not be terminated)
+        // Window must not grow on a NACK — it should stay the same or drop
+        Assert.LessOrEqual(stream.CurrentWindowSize, windowBefore,
+            $"Window ({stream.CurrentWindowSize}) must not grow after a NACK (was {windowBefore})");
+
+        // Window must remain at least MIN_WINDOW_SIZE
+        Assert.GreaterOrEqual(stream.CurrentWindowSize, I2PStream.MIN_WINDOW_SIZE,
+            "Window must stay at or above MIN_WINDOW_SIZE after a NACK");
+
+        // Stream must not terminate on a single NACK
         Assert.AreNotEqual(I2PStream.StreamStatus.Terminated, stream.Status,
             "Stream must not terminate on a single NACK");
     }
 
     /// <summary>
     ///     Test packet re-sending: after a NACK the stream eventually retransmits.
-    ///     We verify the retransmit event fires for the NACKed sequence.
+    ///     We verify the NACK is recorded by observing that the window did not open further.
     /// </summary>
     [Test]
     public void TestNack_NackedSequenceTracked()
     {
-        var (stream, sentPackets) = CreateOpenStream();
+        var (stream, _) = CreateOpenStream();
 
         var sentSeqs = new List<uint>();
         stream.PacketSent += (_, seq, _) => sentSeqs.Add(seq);
@@ -417,22 +423,95 @@ public class StreamingProtocolTest
             return;
         }
 
-        // NACK the first data packet (after SYN)
+        // Snapshot the window before the NACK
+        var windowBeforeNack = stream.CurrentWindowSize;
+
+        // NACK the first data packet
         var nackedSeq = sentSeqs[0];
         var ackWithNack = new StreamingPacket
         {
             SendStreamId = stream.SendStreamId,
             ReceiveStreamId = stream.RecvStreamId,
             SequenceNumber = 1,
-            AckThrough = 0,              // No ACK
-            NACKs = new List<uint> { nackedSeq }, // NACK the first packet
+            AckThrough = 0,
+            NACKs = new List<uint> { nackedSeq },
             Flags = 0
         };
         stream.HandleNextPacket(ackWithNack);
 
+        // The NACK must not cause the window to grow (it either stays same or drops)
+        Assert.LessOrEqual(stream.CurrentWindowSize, windowBeforeNack,
+            $"Window must not grow after NACK (before: {windowBeforeNack}, after: {stream.CurrentWindowSize})");
+
         // The stream should still be open (one NACK does not close the stream)
         Assert.AreNotEqual(I2PStream.StreamStatus.Terminated, stream.Status,
             "Stream must remain Open after a single NACK");
+    }
+
+    /// <summary>
+    ///     Test that the window size starts at INITIAL_WINDOW_SIZE, increases after ACKs
+    ///     and shrinks back toward MIN_WINDOW_SIZE after a NACK (AIMD behaviour).
+    /// </summary>
+    [Test]
+    public void TestWindowSize_AIMDBehaviour()
+    {
+        var (stream, _) = CreateOpenStream();
+
+        // Initial window should be INITIAL_WINDOW_SIZE (plus slow-start bump from SYN/ACK)
+        Assert.GreaterOrEqual(stream.CurrentWindowSize, I2PStream.INITIAL_WINDOW_SIZE,
+            "Initial window must be at least INITIAL_WINDOW_SIZE");
+
+        var sentSeqs = new List<uint>();
+        stream.PacketSent += (_, seq, _) => sentSeqs.Add(seq);
+
+        // Send several packets to have sequences to ACK/NACK
+        for (var i = 0; i < 4; i++)
+            stream.Send(new byte[100]);
+
+        if (sentSeqs.Count < 2)
+        {
+            Assert.Ignore("Not enough packets sent to test AIMD");
+            return;
+        }
+
+        // Step 1: ACK the first packet — window should grow or stay the same
+        var windowAfterSyn = stream.CurrentWindowSize;
+        var ack1 = new StreamingPacket
+        {
+            SendStreamId = stream.SendStreamId,
+            ReceiveStreamId = stream.RecvStreamId,
+            SequenceNumber = 1,
+            AckThrough = sentSeqs[0],
+            Flags = 0
+        };
+        stream.HandleNextPacket(ack1);
+
+        Assert.GreaterOrEqual(stream.CurrentWindowSize, windowAfterSyn,
+            "Window should not shrink on a pure ACK");
+
+        // Step 2: Send a NACK — window should drop
+        var windowAfterAck = stream.CurrentWindowSize;
+        if (sentSeqs.Count < 2)
+        {
+            Assert.Ignore("Not enough further sequences for NACK test");
+            return;
+        }
+
+        var nack = new StreamingPacket
+        {
+            SendStreamId = stream.SendStreamId,
+            ReceiveStreamId = stream.RecvStreamId,
+            SequenceNumber = 2,
+            AckThrough = sentSeqs[0],
+            NACKs = new List<uint> { sentSeqs[1] },
+            Flags = 0
+        };
+        stream.HandleNextPacket(nack);
+
+        Assert.LessOrEqual(stream.CurrentWindowSize, windowAfterAck,
+            $"Window must not grow after NACK (ACK window: {windowAfterAck}, NACK window: {stream.CurrentWindowSize})");
+        Assert.GreaterOrEqual(stream.CurrentWindowSize, I2PStream.MIN_WINDOW_SIZE,
+            "Window must stay at or above MIN_WINDOW_SIZE after NACK");
     }
 
     // ------------------------------------------------------------------

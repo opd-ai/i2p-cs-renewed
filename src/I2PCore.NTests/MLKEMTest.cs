@@ -221,14 +221,122 @@ public class MLKEMTest
     }
 
     // ------------------------------------------------------------------ //
+    // MLKEM-512: additional coverage (two-party exchange, key isolation, multi-encap)
+    // ------------------------------------------------------------------ //
+
+    [Test]
+    public void TestMLKEM512GetPublicKeyFromSecretKey()
+    {
+        var (publicKey, secretKey) = MLKEM512.GenerateKeyPair();
+
+        var extractedPublicKey = MLKEM512.GetPublicKey(secretKey);
+
+        Assert.IsNotNull(extractedPublicKey, "Extracted public key should not be null");
+        Assert.AreEqual(MLKEM512.PublicKeyBytes, extractedPublicKey.Length,
+            "Extracted public key should be 800 bytes");
+        Assert.IsTrue(BufUtils.Equal(publicKey, extractedPublicKey),
+            "Public key extracted from secret key must match original public key");
+    }
+
+    [Test]
+    public void TestMLKEM512TwoPartyExchange()
+    {
+        var (alicePublicKey, aliceSecretKey) = MLKEM512.GenerateKeyPair();
+        var (ciphertext, sharedSecretBob) = MLKEM512.Encapsulate(alicePublicKey);
+        var sharedSecretAlice = MLKEM512.Decapsulate(ciphertext, aliceSecretKey);
+
+        Assert.IsTrue(BufUtils.Equal(sharedSecretBob, sharedSecretAlice),
+            "Alice and Bob must derive the same 32-byte shared secret (MLKEM-512 key agreement)");
+        Assert.IsFalse(sharedSecretAlice.All(b => b == 0),
+            "Shared secret must not be all-zero bytes");
+    }
+
+    [Test]
+    public void TestMLKEM512DifferentKeyPairsProduceDifferentSecrets()
+    {
+        var (pk1, _) = MLKEM512.GenerateKeyPair();
+        var (_, sk2) = MLKEM512.GenerateKeyPair();
+
+        var (ciphertext, secret1) = MLKEM512.Encapsulate(pk1);
+        var rejectedSecret = MLKEM512.Decapsulate(ciphertext, sk2);
+
+        Assert.IsFalse(BufUtils.Equal(secret1, rejectedSecret),
+            "Decapsulating with the wrong secret key must not recover the original shared secret");
+    }
+
+    [Test]
+    public void TestMLKEM512MultipleEncapsulationsAreIndependent()
+    {
+        var (publicKey, secretKey) = MLKEM512.GenerateKeyPair();
+
+        var (ct1, ss1) = MLKEM512.Encapsulate(publicKey);
+        var (ct2, ss2) = MLKEM512.Encapsulate(publicKey);
+
+        Assert.IsFalse(BufUtils.Equal(ss1, ss2),
+            "Each encapsulation should produce an independent random shared secret");
+        Assert.IsTrue(BufUtils.Equal(ss1, MLKEM512.Decapsulate(ct1, secretKey)),
+            "First encapsulation must decapsulate correctly");
+        Assert.IsTrue(BufUtils.Equal(ss2, MLKEM512.Decapsulate(ct2, secretKey)),
+            "Second encapsulation must decapsulate correctly");
+    }
+
+    // ------------------------------------------------------------------ //
+    // MLKEM-1024: additional coverage (implicit rejection, public key extraction, two-party)
+    // ------------------------------------------------------------------ //
+
+    [Test]
+    public void TestMLKEM1024WrongCiphertextProducesImplicitRejection()
+    {
+        var (publicKey, secretKey) = MLKEM1024.GenerateKeyPair();
+        var (ciphertext, encapsulatedSecret) = MLKEM1024.Encapsulate(publicKey);
+
+        var corrupted = ciphertext.ToArray();
+        corrupted[0] ^= 0xFF;
+
+        var rejectedSecret = MLKEM1024.Decapsulate(corrupted, secretKey);
+
+        Assert.IsNotNull(rejectedSecret,
+            "Decapsulation with corrupted ciphertext should return implicit rejection secret, not throw");
+        Assert.IsFalse(BufUtils.Equal(encapsulatedSecret, rejectedSecret),
+            "Corrupted ciphertext should produce a different secret (implicit rejection)");
+    }
+
+    [Test]
+    public void TestMLKEM1024GetPublicKeyFromSecretKey()
+    {
+        var (publicKey, secretKey) = MLKEM1024.GenerateKeyPair();
+
+        var extractedPublicKey = MLKEM1024.GetPublicKey(secretKey);
+
+        Assert.IsNotNull(extractedPublicKey, "Extracted public key should not be null");
+        Assert.AreEqual(MLKEM1024.PublicKeyBytes, extractedPublicKey.Length,
+            "Extracted public key should be 1568 bytes");
+        Assert.IsTrue(BufUtils.Equal(publicKey, extractedPublicKey),
+            "Public key extracted from secret key must match original public key");
+    }
+
+    [Test]
+    public void TestMLKEM1024TwoPartyExchange()
+    {
+        var (alicePublicKey, aliceSecretKey) = MLKEM1024.GenerateKeyPair();
+        var (ciphertext, sharedSecretBob) = MLKEM1024.Encapsulate(alicePublicKey);
+        var sharedSecretAlice = MLKEM1024.Decapsulate(ciphertext, aliceSecretKey);
+
+        Assert.IsTrue(BufUtils.Equal(sharedSecretBob, sharedSecretAlice),
+            "Alice and Bob must derive the same 32-byte shared secret (MLKEM-1024 key agreement)");
+        Assert.IsFalse(sharedSecretAlice.All(b => b == 0),
+            "Shared secret must not be all-zero bytes");
+    }
+
+    // ------------------------------------------------------------------ //
     // Cross-instance isolation
     // ------------------------------------------------------------------ //
 
     [Test]
     public void TestMLKEM768DifferentKeyPairsProduceDifferentSecrets()
     {
-        var (pk1, sk1) = MLKEM768.GenerateKeyPair();
-        var (pk2, sk2) = MLKEM768.GenerateKeyPair();
+        var (pk1, _) = MLKEM768.GenerateKeyPair();
+        var (_, sk2) = MLKEM768.GenerateKeyPair();
 
         // Encapsulate to pk1, try to decapsulate with sk2 — must produce a different secret
         var (ciphertext, secret1) = MLKEM768.Encapsulate(pk1);

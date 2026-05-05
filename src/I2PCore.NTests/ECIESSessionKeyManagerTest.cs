@@ -200,6 +200,8 @@ public class ECIESSessionKeyManagerTest
         var (inbound, outbound) = aliceSkm.SessionCounts;
         Assert.AreEqual(0, inbound,
             "Before handshake completes there should be no established (inbound) sessions");
+        Assert.Greater(outbound, 0,
+            "CreateNewSession should create at least one pending (outbound) session entry");
     }
 
     // ------------------------------------------------------------------
@@ -260,16 +262,15 @@ public class ECIESSessionKeyManagerTest
         var messageA = aliceSkm.CreateNewSession(
             bobDest.IdentHash, bobPubKeyFromBytes, BufUtils.RandomBytes(32));
 
-        // Bob processes — this should register inbound session tags
+        // Bob processes Message A — this calls CreateNewSessionReply internally,
+        // which sets _sendKey making the session IsEstablished.
         bobSkm.ProcessNewSession(messageA, BufUtils.RandomBytes(32));
 
-        // Bob's session manager should now have at least one inbound tag registered
+        // After processing Message A, Bob's session must be established (inbound count > 0)
+        // because CreateNewSessionReply sets the send key within ProcessNewSession.
         var (inbound, _) = bobSkm.SessionCounts;
-        // Note: sessions are not "established" (IsEstablished=false) until Bob's reply
-        // is processed by Alice. Tags may already be registered though.
-        // The count check verifies that ProcessNewSession created the session entry.
-        Logging.LogInformation(
-            $"Bob session counts after ProcessNewSession: inbound={inbound}");
+        Assert.Greater(inbound, 0,
+            "ProcessNewSession must create an established inbound session entry on Bob's side");
     }
 
     // ------------------------------------------------------------------

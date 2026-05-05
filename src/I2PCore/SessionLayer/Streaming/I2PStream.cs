@@ -128,6 +128,11 @@ public class I2PStream : IDisposable
     private int _windowSize = INITIAL_WINDOW_SIZE;
 
     /// <summary>
+    ///     Current send window size. Exposed internally for unit tests.
+    /// </summary>
+    internal int CurrentWindowSize => _windowSize;
+
+    /// <summary>
     ///     Create an outgoing stream
     /// </summary>
     public I2PStream(

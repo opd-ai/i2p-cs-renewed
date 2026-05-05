@@ -36,6 +36,11 @@ public class SSU2ConnectivityTests
     ///     C# router initiates SSU2 session to i2pd.
     ///     Asserts the established transport is SSU2; NTCP2 fallback is treated as a failure.
     ///     Previously this test allowed NTCP2 fallback, masking SSU2 breakage.
+    ///
+    ///     NOTE: <see cref="TransportProvider"/> picks transport via <c>.Random()</c> among
+    ///     providers with equal capability. If both SSU2 and NTCP2 addresses are present for
+    ///     i2pd this test may intermittently use NTCP2. Run with i2pd configured to publish
+    ///     only SSU2 addresses (or NTCP2 disabled) for deterministic results.
     /// </summary>
     [Test]
     [CancelAfter(30000)]
@@ -64,8 +69,11 @@ public class SSU2ConnectivityTests
     }
 
     /// <summary>
-    ///     i2pd initiates an inbound SSU2 connection to the C# router.
-    ///     Verifies the C# router can accept an inbound SSU2 session.
+    ///     Verifies that an SSU2 connection is established between C# router and i2pd after
+    ///     the C# router initiates contact. This is an outbound-initiated test — it does not
+    ///     prove that i2pd independently opened an inbound connection to the C# router.
+    ///     True inbound-only verification would require disabling NTCP2 outbound initiation
+    ///     or intercepting i2pd's outbound session setup.
     /// </summary>
     [Test]
     [CancelAfter(30000)]
@@ -86,7 +94,7 @@ public class SSU2ConnectivityTests
             "An SSU2 connection must be established between C# router and i2pd");
 
         var protocol = router.GetConnectionProtocol(i2pdHash);
-        Logging.LogInformation($"Inbound/outbound SSU2 connection protocol: {protocol}");
+        Logging.LogInformation($"Bidirectional SSU2 connection protocol: {protocol}");
 
         // Assert SSU2 specifically
         Assert.IsTrue(

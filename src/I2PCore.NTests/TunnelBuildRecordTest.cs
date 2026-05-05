@@ -234,8 +234,8 @@ public class TunnelBuildRecordTest
     [Test]
     public void TestLongBuildRequestRecord_Sizes()
     {
-        // Per i2pd spec the long record is 528 bytes encrypted
-        Assert.Greater(LongBuildRequestRecord.EncryptedRecordSize, 0,
-            "LongBuildRequestRecord.EncryptedRecordSize must be > 0");
+        // Per i2pd LONG_TUNNEL_BUILD_RECORD_SIZE the long record is 528 bytes on-wire
+        Assert.AreEqual(528, LongBuildRequestRecord.EncryptedRecordSize,
+            "LongBuildRequestRecord.EncryptedRecordSize must be exactly 528 bytes per i2pd spec");
     }
 }

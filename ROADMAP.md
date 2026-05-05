@@ -63,7 +63,7 @@
 
 **Success Criteria**:
 - [ ] `TestCSharpConnectsToI2pd_SSU2` in `SSU2ConnectivityTests.cs` passes with SSU2 specifically (no NTCP2 fallback) against a local i2pd instance
-- [x] `TestI2pdConnectsToCSharp_SSU2` passes (inbound) — test added; requires live i2pd peer to run
+- [ ] `TestI2pdConnectsToCSharp_SSU2` passes (inbound) — `TestI2pdConnectsToCSharp_SSU2` added but initiates an outbound connection; true inbound-only verification requires disabling NTCP2 outbound
 - [x] At least 3 offline unit tests for SSU2 packet serialization/crypto round-trips pass in CI without a live peer
 
 **Risk**: High — SSU2 failure is a complete protocol-level breakage, and the existing 1700-line session file will require careful state machine debugging.
@@ -85,7 +85,7 @@
 - [ ] `EncryptionCompatibilityTests.cs` echo test passes end-to-end against i2pd
 - [ ] `DataTransferTests.cs` sends and receives at least 1KB of data via ECIES-encrypted garlic
 - [x] Zero CS0414 warnings in `I2PStream.cs` — `_isTimeoutResend` field has been removed
-- [x] `ECIESSessionKeyManager.cs` has unit test coverage for new-session, existing-session, and re-key paths — 14 tests in `ECIESSessionKeyManagerTest.cs`
+- [x] `ECIESSessionKeyManager.cs` has unit test coverage for new-session path — 14 tests in `ECIESSessionKeyManagerTest.cs`; **existing-session and re-key paths are not yet covered** (see: [x] items below are new-session only)
 
 **Risk**: High — This is the most complex cryptographic component; bugs here produce silent data corruption, not immediate crashes.
 
