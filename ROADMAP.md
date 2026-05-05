@@ -99,7 +99,7 @@
 - [ ] Audit outbound tunnel endpoint packet handling against the I2NP spec — compare with `src/I2PCore/TunnelLayer/I2NP/Messages/VariableTunnelBuildMessage.cs` (613 lines) for message format correctness
 - [ ] Add offline unit tests for `GatewayTunnel.HandleReceiveQueue()` that verify it processes a valid inbound tunnel data message without requiring a live peer
 - [ ] Decompose `TunnelProvider.cs` (2380 lines) — extract tunnel build, tunnel maintenance, and tunnel selection into separate classes to make the code reviewable
-- [ ] Update `TunnelBuildTests.cs` to include at least one test verifiable without a live network (e.g., build record serialization/deserialization)
+- [x] Update `TunnelBuildTests.cs` to include at least one test verifiable without a live network (added `TunnelBuildRecordTest.cs` with 13 offline tests for serialization, flag checks, and reply record parsing)
 
 **Success Criteria**:
 - [ ] CS0114 warning in `GatewayTunnel.cs` is resolved with the correct modifier
