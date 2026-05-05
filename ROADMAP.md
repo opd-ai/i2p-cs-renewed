@@ -119,7 +119,7 @@
 - [x] Update `actions/checkout` from `v2` to `v4`
 - [x] Update `actions/setup-dotnet` from `v1` to `v4`
 - [x] Add `dotnet list package --vulnerable --include-transitive` step to catch security regressions
-- [x] Add `--filter "Category!=Integration"` to `dotnet test` so that offline unit tests always run in CI (integration tests require a live i2pd peer)
+- [x] Add `--filter "Category!=Integration&Category!=ScaledNetwork"` to `dotnet test` so that offline unit tests always run in CI (integration tests require a live i2pd peer; ScaledNetwork tests require a live SAM bridge)
 - [x] Add code coverage collection: add `coverlet.collector` package to `I2PCore.NTests.csproj` and pass `--collect:"XPlat Code Coverage"` to the test step
 
 **Success Criteria**:

@@ -24,7 +24,7 @@ jobs:
     - name: Security audit
       run: dotnet list package --vulnerable --include-transitive
     - name: Test
-      run: dotnet test --no-build --verbosity normal --filter "Category!=Integration" --collect:"XPlat Code Coverage"
+      run: dotnet test --no-build --verbosity normal --filter "Category!=Integration&Category!=ScaledNetwork" --collect:"XPlat Code Coverage"
     - name: Upload coverage
       uses: actions/upload-artifact@v4
       if: always()

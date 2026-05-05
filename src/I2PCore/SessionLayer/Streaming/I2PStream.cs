@@ -30,11 +30,11 @@ public class I2PStream : IDisposable
     // Constants per i2pd reference (Streaming.h)
     public const int STREAMING_MTU = 1730;
     public const int STREAMING_MTU_RATCHETS = 1812;
-    public const int INITIAL_WINDOW_SIZE = 64; // Java I2P: MAX_SLOW_START_WINDOW = 64
+    public const int INITIAL_WINDOW_SIZE = 10; // i2pd: initial window size
     public const int MIN_WINDOW_SIZE = 3;
     public const int MAX_WINDOW_SIZE = 512;
-    public const int INITIAL_RTT = 50; // ms — conservative estimate, EWMA will measure the real value
-    public const int INITIAL_RTO = 1000; // ms
+    public const int INITIAL_RTT = 1500; // ms — i2pd initial RTT estimate
+    public const int INITIAL_RTO = 9000; // ms — i2pd initial RTO
     public const int MIN_RTO = 20; // ms
     public const int SYN_TIMEOUT = 200; // ms
     public const int MAX_NUM_RESEND_ATTEMPTS = 10;
