@@ -176,7 +176,7 @@ public static class SSU2HeaderEncryption
     ///       srcConnID (8 bytes) + token (8 bytes) + ephemeral key (32 bytes).
     ///     A single 48-byte ChaCha20 keystream is applied so that:
     ///       - bytes 0-15 of keystream cover srcConnID+token (packet bytes 16-31)
-    ///       - bytes 16-47 of keystream cover the ephemeral key  (packet bytes 32-63)
+    ///       - bytes 16-47 of keystream cover the ephemeral key (packet bytes 32-63)
     ///     ChaCha20 is its own inverse, so this method decrypts as well as encrypts.
     /// </summary>
     /// <param name="packet">Full packet buffer (modified in-place).</param>

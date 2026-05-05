@@ -508,8 +508,8 @@ public class SSU2Session : ITransport
             if (IsPQ) ephKey[31] |= 0x80;
             else ephKey[31] &= 0x7f;
 
-            // The ephemeral key occupies bytes 16-47 of headerX, so its obfuscated first byte
-            // uses keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
+            // The ephemeral key occupies bytes 16-47 of the 48-byte headerX region (packet bytes 32-63),
+            // so its obfuscated first byte uses keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
             var obfFirstByte = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(ephKey[0], kHeader2);
 
             if ((obfFirstByte & 0x80) == 0 && (IsPQ || (ephKey[31] & 0x80) == 0))
@@ -1425,8 +1425,8 @@ public class SSU2Session : ITransport
             if (IsPQ) ephKey[31] |= 0x80;
             else ephKey[31] &= 0x7f;
 
-            // The ephemeral key occupies bytes 16-47 of headerX, so its obfuscated first byte
-            // uses keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
+            // The ephemeral key occupies bytes 16-47 of the 48-byte headerX region (packet bytes 32-63),
+            // so its obfuscated first byte uses keystream byte 16 of ChaCha20(kHeader2, zeroNonce).
             var obfFirstByte = SSU2HeaderEncryption.GetEphKeyObfuscatedFirstByte(ephKey[0], kHeader2);
 
             if ((obfFirstByte & 0x80) == 0 && (IsPQ || (ephKey[31] & 0x80) == 0))
