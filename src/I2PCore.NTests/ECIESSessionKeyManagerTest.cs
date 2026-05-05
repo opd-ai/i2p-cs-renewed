@@ -297,7 +297,7 @@ public class ECIESSessionKeyManagerTest
         // Random 16-byte message with unknown tag bytes — should not throw,
         // should return a failure result
         var randomMessage = BufUtils.RandomBytes(128);
-        ProcessedDestinationMessage result = null;
+        ProcessedDestinationMessage? result = null;
 
         Assert.DoesNotThrow(() =>
         {
@@ -305,7 +305,7 @@ public class ECIESSessionKeyManagerTest
         }, "ProcessMessage with an unknown tag should not throw, only fail gracefully");
 
         Assert.IsNotNull(result, "ProcessMessage must always return a result object");
-        Assert.IsFalse(result.Success,
+        Assert.IsFalse(result!.Success,
             "ProcessMessage with unrecognized content should set Success=false");
     }
 
