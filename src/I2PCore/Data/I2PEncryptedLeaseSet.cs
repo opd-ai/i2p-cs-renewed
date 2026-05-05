@@ -157,7 +157,7 @@ public class I2PEncryptedLeaseSet : I2PType, ILeaseSet
     {
         leaseSet = null;
 
-        if (blindingKey == null || EncryptedData == null || EncryptedData.Length < 32)
+        if (blindingKey == null || EncryptedData.IsEmpty || EncryptedData.Length < 32)
         {
             Logging.LogDebug("I2PEncryptedLeaseSet: Invalid parameters for decryption");
             return false;

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using I2PCore.SessionLayer;
@@ -33,7 +34,8 @@ public class SSU2ConnectivityTests
 
     /// <summary>
     ///     C# router initiates SSU2 session to i2pd.
-    ///     Verifies the Noise XK handshake over UDP completes.
+    ///     Asserts the established transport is SSU2; NTCP2 fallback is treated as a failure.
+    ///     Previously this test allowed NTCP2 fallback, masking SSU2 breakage.
     /// </summary>
     [Test]
     [CancelAfter(30000)]
@@ -46,7 +48,6 @@ public class SSU2ConnectivityTests
         // Connect to i2pd
         router.ConnectToPeer(i2pdInfo);
 
-        // Wait for connection — may use either NTCP2 or SSU2
         var connected = await router.WaitForConnection(i2pdHash, 30000);
         Assert.IsTrue(connected,
             "C# router should establish connection to i2pd");
@@ -54,9 +55,43 @@ public class SSU2ConnectivityTests
         var protocol = router.GetConnectionProtocol(i2pdHash);
         Logging.LogInformation($"Connected to i2pd via {protocol}");
 
-        // Note: TransportProvider may prefer NTCP2 over SSU2.
-        // This test verifies that at minimum a transport connection is established.
-        // To force SSU2, we would need to disable NTCP2 on one side.
+        // Assert SSU2 specifically — NTCP2 fallback is a test failure because it
+        // means SSU2 handshake silently failed and NTCP2 was used instead.
+        Assert.IsTrue(
+            protocol != null && protocol.IndexOf("SSU2", StringComparison.OrdinalIgnoreCase) >= 0,
+            $"Connection must use SSU2 transport (not NTCP2 fallback), got: {protocol ?? "(null)"}. " +
+            "NTCP2 fallback masks SSU2 handshake failures.");
+    }
+
+    /// <summary>
+    ///     i2pd initiates an inbound SSU2 connection to the C# router.
+    ///     Verifies the C# router can accept an inbound SSU2 session.
+    /// </summary>
+    [Test]
+    [CancelAfter(30000)]
+    public async Task TestI2pdConnectsToCSharp_SSU2()
+    {
+        var router = TestNetworkFixture.CSharpRouter;
+
+        // Trigger a bidirectional exchange: when we send to i2pd it may connect back to us.
+        // This indirectly causes i2pd to see our SSU2 address and attempt an inbound session.
+        var i2pdInfo = TestNetworkFixture.I2pdRouterInfo;
+        var i2pdHash = i2pdInfo.Identity.IdentHash;
+
+        router.ConnectToPeer(i2pdInfo);
+
+        // Wait for any connection (outbound or inbound) in either direction
+        var connected = await router.WaitForConnection(i2pdHash, 30000);
+        Assert.IsTrue(connected,
+            "An SSU2 connection must be established between C# router and i2pd");
+
+        var protocol = router.GetConnectionProtocol(i2pdHash);
+        Logging.LogInformation($"Inbound/outbound SSU2 connection protocol: {protocol}");
+
+        // Assert SSU2 specifically
+        Assert.IsTrue(
+            protocol != null && protocol.IndexOf("SSU2", StringComparison.OrdinalIgnoreCase) >= 0,
+            $"Connection must use SSU2 transport, got: {protocol ?? "(null)"}");
     }
 
     /// <summary>
