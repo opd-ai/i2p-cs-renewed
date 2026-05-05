@@ -74,7 +74,7 @@
 **Why**: Both ECIES-X25519 and MLKEM768-X25519 garlic encryption are stated as "70%, doesn't work properly". These are the end-to-end encryption layer that every client interaction (HTTP proxy, server tunnels, streaming) depends on. All client-facing features are blocked at 60% until this is resolved.  
 **Current State**: `src/I2PCore/SessionLayer/ECIES/ECIESSessionKeyManager.cs` (608 lines) and `Session.cs` (670 lines) implement the ratchet and tag management. Garlic routing is unit-tested in `GarlicTest.cs`, but session-level integration tests (`DataTransferTests.cs`, `EncryptionCompatibilityTests.cs`) require live network peers.  
 **Required Changes**:
-- [ ] Add unit tests for `ECIESSessionKeyManager.cs` covering: new session tag generation, existing session tag lookup, and ratchet forward on `NextKey` block reception
+- [x] Add unit tests for `ECIESSessionKeyManager.cs` covering: new session tag generation, existing session tag lookup, and ratchet forward on `NextKey` block reception
 - [x] Add unit tests for MLKEM768 key encapsulation round-trip in `src/I2PCore/Crypto/MLKEM/MLKEM768.cs` — also adds MLKEM512 and MLKEM1024 tests in `MLKEMTest.cs`
 - [ ] Trace a complete garlic message from `ClientDestination.Send.cs` through `Session.cs` to `ECIESSessionKeyManager.cs` to find where the 70%→100% gap is (missing `LS2` re-inclusion? Wrong tag indexing?)
 - [ ] Fix session key manager to correctly handle re-keying when the remote's `NextKey` block arrives
