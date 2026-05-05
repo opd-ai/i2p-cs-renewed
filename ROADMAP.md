@@ -55,16 +55,16 @@
 **Current State**: SSU2 state machine code exists in `src/I2PCore/TransportLayer/SSU2/SSU2Session.cs` (1704 lines) and supporting files, but README explicitly marks both inbound and outbound as "Totally broken". Integration tests in `SSU2ConnectivityTests.cs` exist but require a live i2pd peer and cannot run in CI.  
 **Required Changes**:
 - [x] Instrument `SSU2Session.cs` with debug logging at each handshake state transition to identify where SessionRequest/SessionCreated/SessionConfirmed exchange fails
-- [ ] Compare `SSU2Host.cs` packet routing with the i2pd reference implementation (i2pd `SSU2.cpp`/`SSU2Session.cpp`) to find divergence in the Noise XK handshake
-- [ ] Verify that `SSU2SecurityValidator.cs` correctly validates headers before state machine transitions
-- [ ] Fix `SSU2AckManager.cs` if ACK handling is preventing the handshake from completing
-- [ ] Add offline unit tests in `I2PCore.NTests` that replay captured SSU2 handshake bytes (no live peer required)
+- [x] Compare `SSU2Host.cs` packet routing with the i2pd reference implementation (i2pd `SSU2.cpp`/`SSU2Session.cpp`) to find divergence in the Noise XK handshake
+- [x] Verify that `SSU2SecurityValidator.cs` correctly validates headers before state machine transitions
+- [x] Fix `SSU2AckManager.cs` if ACK handling is preventing the handshake from completing
+- [x] Add offline unit tests in `I2PCore.NTests` that replay captured SSU2 handshake bytes (no live peer required)
 - [ ] Update `SSU2ConnectivityTests.cs` to assert specific protocol — currently it allows fallback to NTCP2 which masks SSU2 failures
 
 **Success Criteria**:
 - [ ] `TestCSharpConnectsToI2pd_SSU2` in `SSU2ConnectivityTests.cs` passes with SSU2 specifically (no NTCP2 fallback) against a local i2pd instance
 - [ ] `TestI2pdConnectsToCSharp_SSU2` passes (inbound)
-- [ ] At least 3 offline unit tests for SSU2 packet serialization/crypto round-trips pass in CI without a live peer
+- [x] At least 3 offline unit tests for SSU2 packet serialization/crypto round-trips pass in CI without a live peer
 
 **Risk**: High — SSU2 failure is a complete protocol-level breakage, and the existing 1700-line session file will require careful state machine debugging.
 

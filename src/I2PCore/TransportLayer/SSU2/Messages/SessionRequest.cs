@@ -44,16 +44,23 @@ public class SessionRequest
         var kHeader1 = bobIntroKey;
         var kHeader2 = bobIntroKey;
 
-        // Decrypt header in place using IVs from packet end
+        // Decrypt the first 16 bytes using IVs from packet end (bytes 0-15 only)
         SSU2HeaderEncryption.DecryptLongHeaderInPacket(fullPacket, 0, kHeader1, kHeader2);
 
-        // Parse decrypted header from packet
+        // Deobfuscate headerX: bytes 16-63, which contains:
+        //   srcConnId (bytes 16-23) | token (bytes 24-31) | ephKey (bytes 32-63)
+        // A single 48-byte ChaCha20(introKey, zeroNonce) keystream is applied to all of bytes 16-63.
+        // Per i2pd: ChaCha20(headerX, 48, introKey, zeroNonce, headerX)
+        // Must be done BEFORE ParseLongHeader so SourceConnectionId (bytes 16-23) and Token (bytes 24-31)
+        // are deobfuscated before being read.
+        SSU2HeaderEncryption.ObfuscateHeaderX(fullPacket, 16, kHeader2);
+
+        // Parse decrypted header from packet (bytes 0-31 are now fully plain)
         request.Header = SSU2Header.ParseLongHeader(new I2PBufferCursor(fullPacket));
 
-        // Decrypt ephemeral key (obfuscated with ChaCha20)
-        var encryptedX = new byte[32];
-        Array.Copy(fullPacket, 32, encryptedX, 0, 32);
-        request.EphemeralKey = SSU2HeaderEncryption.DeobfuscateEphemeralKey(encryptedX, kHeader2);
+        // Extract ephemeral key from bytes 32-63 (now deobfuscated)
+        request.EphemeralKey = new byte[32];
+        Array.Copy(fullPacket, 32, request.EphemeralKey, 0, 32);
 
         // Read encrypted payload (rest of the packet)
         var remaining = fullPacket.Length - 64;
@@ -73,20 +80,24 @@ public class SessionRequest
         // Build header (plaintext first)
         var header = Header.ToByteArray();
 
-        // Build complete packet first: header + ephKey + payload (needed for IV derivation)
-        var obfuscatedX = SSU2HeaderEncryption.ObfuscateEphemeralKey(ephemeralKey, kHeader2);
-
+        // Build complete packet: long header (32 bytes) + plain ephKey (32 bytes) + payload.
+        // Apply header encryption in two steps to match i2pd's layout exactly:
+        //   1. Bytes  0-15: XOR with ChaCha20 masks derived from packet end.
+        //   2. Bytes 16-63: single 48-byte ChaCha20(kHeader2, zeroIV) over srcConnID+token+ephKey.
         var padding = Padding ?? Array.Empty<byte>();
-        var packet = new byte[header.Length + obfuscatedX.Length + encryptedPayload.Length + padding.Length];
+        var packet = new byte[header.Length + ephemeralKey.Length + encryptedPayload.Length + padding.Length];
         Array.Copy(header, 0, packet, 0, header.Length);
-        Array.Copy(obfuscatedX, 0, packet, header.Length, obfuscatedX.Length);
-        Array.Copy(encryptedPayload, 0, packet, header.Length + obfuscatedX.Length, encryptedPayload.Length);
+        Array.Copy(ephemeralKey, 0, packet, header.Length, ephemeralKey.Length);
+        Array.Copy(encryptedPayload, 0, packet, header.Length + ephemeralKey.Length, encryptedPayload.Length);
         if (padding.Length > 0)
-            Array.Copy(padding, 0, packet, header.Length + obfuscatedX.Length + encryptedPayload.Length,
+            Array.Copy(padding, 0, packet, header.Length + ephemeralKey.Length + encryptedPayload.Length,
                 padding.Length);
 
-        // Encrypt header in place using IVs from packet end
+        // Step 1: Encrypt bytes 0-15 using IVs from packet end
         SSU2HeaderEncryption.EncryptLongHeaderInPacket(packet, 0, kHeader1, kHeader2);
+
+        // Step 2: Obfuscate headerX bytes 16-63 (srcConnID+token+ephKey) with a single 48-byte keystream
+        SSU2HeaderEncryption.ObfuscateHeaderX(packet, 16, kHeader2);
 
         return packet;
     }
