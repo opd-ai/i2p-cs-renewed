@@ -30,11 +30,11 @@ public class I2PStream : IDisposable
     // Constants per i2pd reference (Streaming.h)
     public const int STREAMING_MTU = 1730;
     public const int STREAMING_MTU_RATCHETS = 1812;
-    public const int INITIAL_WINDOW_SIZE = 64; // Java I2P: MAX_SLOW_START_WINDOW = 64
+    public const int INITIAL_WINDOW_SIZE = 10; // i2pd: initial window size
     public const int MIN_WINDOW_SIZE = 3;
     public const int MAX_WINDOW_SIZE = 512;
-    public const int INITIAL_RTT = 50; // ms — conservative estimate, EWMA will measure the real value
-    public const int INITIAL_RTO = 1000; // ms
+    public const int INITIAL_RTT = 1500; // ms — i2pd initial RTT estimate
+    public const int INITIAL_RTO = 9000; // ms — i2pd initial RTO
     public const int MIN_RTO = 20; // ms
     public const int SYN_TIMEOUT = 200; // ms
     public const int MAX_NUM_RESEND_ATTEMPTS = 10;
@@ -89,7 +89,6 @@ public class I2PStream : IDisposable
     private bool _isChoking2;
     private bool _isChoking3;
     private bool _isFirstAck = true;
-    private bool _isTimeoutResend;
     private bool _synSent;
     private double _jitter = 50;
     private double _jitterAccum;
@@ -1162,7 +1161,6 @@ public class I2PStream : IDisposable
                     pkt.Resent = true;
                     pkt.SendTime = now;
                     toResend.Add(pkt);
-                    _isTimeoutResend = false;
                 }
 
         // Timeout-based retransmit: only one packet per RTO (RFC compliance)
@@ -1212,7 +1210,6 @@ public class I2PStream : IDisposable
                 oldest.Resent = true;
                 oldest.SendTime = now;
                 toResend.Add(oldest);
-                _isTimeoutResend = true;
 
                 // Timeout means congestion: reset window
                 ResetWindowSize();

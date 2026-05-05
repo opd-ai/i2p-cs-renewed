@@ -96,7 +96,7 @@ public class EncryptionCompatibilityTests
     ///     the transport layer handles them without errors.
     /// </summary>
     [Test]
-    [Timeout(60000)]
+    [CancelAfter(60000)]
     public async Task TestECIES_GarlicMessage_I2pd()
     {
         var router = TestNetworkFixture.CSharpRouter;
@@ -159,7 +159,7 @@ public class EncryptionCompatibilityTests
     ///     produces valid handshakes.
     /// </summary>
     [Test]
-    [Timeout(30000)]
+    [CancelAfter(30000)]
     public async Task TestMLKEM768_Hybrid_I2pd()
     {
         var i2pdInfo = TestNetworkFixture.I2pdRouterInfo;

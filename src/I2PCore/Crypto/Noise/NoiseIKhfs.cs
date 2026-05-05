@@ -299,7 +299,7 @@ public class NoiseIKhfs : NoiseHandshakeState
         return payload;
     }
 
-    public (byte[] sendKey, byte[] receiveKey, byte[] ck) FinalizeHandshake()
+    public new (byte[] sendKey, byte[] receiveKey, byte[] ck) FinalizeHandshake()
     {
         var (k1, k2, ck) = Split();
         return isInitiator ? (k1, k2, ck) : (k2, k1, ck);

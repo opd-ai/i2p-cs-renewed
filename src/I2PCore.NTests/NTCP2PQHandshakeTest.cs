@@ -54,6 +54,7 @@ public class NTCP2PQHandshakeTest
         Assert.IsTrue(BufUtils.Equal(msg1Payload, bobRecoveredPayload1), "Msg 1 payload mismatch");
 
         // --- Message 2: Bob -> Alice (e, ee, ekem1, p) ---
+        bob.GenerateBobEphemeralKeys();
         var bobCipherKey2 = bob.PerformMessage2EphemeralAndEE();
 
         // Bob encapsulates (ekem1)

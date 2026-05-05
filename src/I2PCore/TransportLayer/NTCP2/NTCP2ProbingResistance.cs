@@ -102,7 +102,12 @@ public static class NTCP2ProbingResistance
 
                 try
                 {
+                    // Intentionally using Read (not ReadExactly): we only want to consume whatever
+                    // is available; blocking until the exact count arrives would hang the receive
+                    // loop when the stream has Timeout.Infinite (probing resistance, not data integrity).
+#pragma warning disable CA2022
                     stream.Read(buffer, 0, buffer.Length);
+#pragma warning restore CA2022
                 }
                 catch
                 {
