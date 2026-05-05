@@ -78,7 +78,7 @@
 - [x] Add unit tests for MLKEM768 key encapsulation round-trip in `src/I2PCore/Crypto/MLKEM/MLKEM768.cs` — also adds MLKEM512 and MLKEM1024 tests in `MLKEMTest.cs`
 - [ ] Trace a complete garlic message from `ClientDestination.Send.cs` through `Session.cs` to `ECIESSessionKeyManager.cs` to find where the 70%→100% gap is (missing `LS2` re-inclusion? Wrong tag indexing?)
 - [ ] Fix session key manager to correctly handle re-keying when the remote's `NextKey` block arrives
-- [ ] Add unit tests for `StreamingProtocolTest.cs` covering retransmission and window management (currently `I2PStream.cs` has `_isTimeoutResend` assigned but unused at line 92 — CS0414)
+- [x] Add unit tests for `StreamingProtocolTest.cs` covering retransmission and window management (added: window flow control, ACK opens window, sequence number monotonicity, NACK handling, NACK packet round-trip)
 - [x] Resolve CS0414 warning: `I2PStream._isTimeoutResend` at `src/I2PCore/SessionLayer/Streaming/I2PStream.cs:92` — either implement the resend timeout or remove the unused field
 
 **Success Criteria**:
