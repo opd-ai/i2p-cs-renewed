@@ -89,8 +89,8 @@ i2pd instance and are excluded from CI.
 2. **Complete ECIES session encryption** — unblock HTTP proxy and server-side tunnel flows.
 3. **Reduce memory usage** — NTCP2 makes excessive `new byte[]` allocations; migrate hot paths to
    `ArrayPool`.
-4. **Improve CI** — update the GitHub Actions workflow from `dotnet-version: 5.0.x` to
-   `dotnet-version: 10.0.x` (currently broken).
+4. **Expand CI coverage** — add coverage thresholds and integrate static analysis (e.g., Roslyn
+   analyzers) to catch regressions earlier.
 5. **ML-KEM integration tests** — add automated round-trip tests for NTCP2-PQ handshake.
 
 ---
