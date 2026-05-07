@@ -1,7 +1,0 @@
-Test run for /home/runner/work/i2p-cs-renewed/i2p-cs-renewed/src/I2PCore.NTests/bin/Debug/net10.0/I2PCore.NTests.dll (.NETCoreApp,Version=v10.0)
-A total of 1 test files matched the specified pattern.
-  Skipped TestNTCP2RouterInfoBlock [14 ms]
-WARNING: Overwriting results file: /home/runner/work/i2p-cs-renewed/i2p-cs-renewed/src/I2PCore.NTests/TestResults/baseline-tests.trx
-Results File: /home/runner/work/i2p-cs-renewed/i2p-cs-renewed/src/I2PCore.NTests/TestResults/baseline-tests.trx
-
-Passed!  - Failed:     0, Passed:   232, Skipped:     1, Total:   233, Duration: 23 s - I2PCore.NTests.dll (net10.0)
