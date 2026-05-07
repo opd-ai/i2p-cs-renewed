@@ -76,7 +76,7 @@
 **Required Changes**:
 - [x] Add unit tests for `ECIESSessionKeyManager.cs` covering: new session tag generation, existing session tag lookup, and ratchet forward on `NextKey` block reception
 - [x] Add unit tests for MLKEM768 key encapsulation round-trip in `src/I2PCore/Crypto/MLKEM/MLKEM768.cs` — also adds MLKEM512 and MLKEM1024 tests in `MLKEMTest.cs`
-- [ ] Trace a complete garlic message from `ClientDestination.Send.cs` through `Session.cs` to `ECIESSessionKeyManager.cs` to find where the 70%→100% gap is (missing `LS2` re-inclusion? Wrong tag indexing?)
+- [x] Trace a complete garlic message from `ClientDestination.Send.cs` through `Session.cs` to `ECIESSessionKeyManager.cs` to find where the 70%→100% gap is — traced path: `ClientDestination.Send` → `Session.EncryptECIES`/`EciesKeys.CreateExistingSession|CreateNewSession` → `ECIESSessionKeyManager.ProcessMessage` → `SessionManager.TranslateEciesGarlic`; identified concrete gap: non-`GarlicCloveBlock` ECIES blocks (including `NextKeyBlock`) are parsed but ignored by destination message handling, so re-key transitions are never applied on this path.
 - [ ] Fix session key manager to correctly handle re-keying when the remote's `NextKey` block arrives
 - [x] Add unit tests for `StreamingProtocolTest.cs` covering retransmission and window management (added: window flow control, ACK opens window, sequence number monotonicity, NACK handling, NACK packet round-trip)
 - [x] Resolve CS0414 warning: `I2PStream._isTimeoutResend` at `src/I2PCore/SessionLayer/Streaming/I2PStream.cs:92` — either implement the resend timeout or remove the unused field
